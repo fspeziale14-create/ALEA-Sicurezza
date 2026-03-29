@@ -4,7 +4,7 @@ import { MENU_CATEGORIES, MENU_PRICES, BEVERAGE_COURSES, weekDaysOrdered, mapDay
 import { useState, useEffect } from 'react';
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { Activity, Cloud, CloudRain, Users, TrendingUp, Sun, Moon, CalendarCheck, CheckCircle2, ClipboardCheck, UsersRound, Zap, CalendarDays, Clock, ChefHat, ConciergeBell, Plus, Trash2, AlertTriangle, PiggyBank, CalendarRange, Pencil, LayoutGrid, ArrowRightCircle, Utensils, Boxes, Loader2, Settings2, BookOpen, X, Check, XCircle, ChevronRight, Edit3, ChevronDown, ChevronUp, UserCog, CookingPot, ClipboardList } from 'lucide-react';
-import aleaLogo from "figma:asset/26318c92830d68ea1e1ec06c4251d2ca4b183d14.png";
+
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Label } from './components/ui/label';
@@ -1439,7 +1439,7 @@ function App() {
             <div className={`w-full max-w-md p-8 md:p-10 rounded-2xl shadow-xl border flex flex-col items-center relative overflow-hidden ${cardBg}`}>
               <div className="flex items-center justify-center gap-4 mb-8 w-full">
                 <div className="flex aspect-square size-16 items-center justify-center rounded-2xl bg-[#F4F1EA] shrink-0 border border-[#EAE5DA]">
-                  <img src={aleaLogo} alt="ALEA Logo" className="w-[75%] h-[75%] object-contain" />
+                  <img src="/alea-logo.jpeg" alt="ALEA Logo" className="w-[75%] h-[75%] object-contain" />
                 </div>
                 <svg viewBox="0 0 108 40" className={`h-12 w-auto ${isDinner ? 'text-[#F4F1EA]' : 'text-[#3E2723]'}`} fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="square" strokeLinejoin="miter">
                   <polyline points="2,32 14,8 26,32" /><polyline points="34,8 34,32 50,32" /><polyline points="74,8 58,8 58,32 74,32" /><line x1="58" y1="20" x2="70" y2="20" /><polyline points="82,32 94,8 106,32" />
@@ -1509,7 +1509,7 @@ function App() {
                 <div className="flex flex-col items-center mb-12">
                     <div className="flex items-center gap-4 mb-4">
                         <div className="flex aspect-square size-14 items-center justify-center rounded-2xl bg-[#F4F1EA] shrink-0 shadow-md border border-[#EAE5DA]">
-                            <img src={aleaLogo} alt="ALEA Logo" className="w-[75%] h-[75%] object-contain" />
+                            <img src="/alea-logo.jpeg" alt="ALEA Logo" className="w-[75%] h-[75%] object-contain" />
                         </div>
                         <svg viewBox="0 0 108 40" className={`h-10 w-auto ${isDinner ? 'text-[#F4F1EA]' : 'text-[#3E2723]'}`} fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="square" strokeLinejoin="miter">
                             <polyline points="2,32 14,8 26,32" /><polyline points="34,8 34,32 50,32" /><polyline points="74,8 58,8 58,32 74,32" /><line x1="58" y1="20" x2="70" y2="20" /><polyline points="82,32 94,8 106,32" />
@@ -1591,7 +1591,7 @@ function App() {
           <header className={`relative flex min-h-16 shrink-0 items-center justify-between border-b px-4 sm:px-6 py-2 flex-wrap gap-2 ${bgColor} ${isDinner ? 'border-[#334155]' : 'border-[#EAE5DA]'}`}>
               <div className="flex items-center gap-2 sm:gap-3">
                   <div className="flex aspect-square size-7 sm:size-8 items-center justify-center rounded-lg bg-[#F4F1EA] shrink-0 shadow-sm border border-[#EAE5DA]">
-                      <img src={aleaLogo} alt="ALEA Logo" className="w-[75%] h-[75%] object-contain" />
+                      <img src="/alea-logo.jpeg" alt="ALEA Logo" className="w-[75%] h-[75%] object-contain" />
                   </div>
                   <div className="flex items-center gap-2">
                       <svg viewBox="0 0 108 40" className={`h-3.5 sm:h-5 w-auto ${isDinner ? 'text-[#F4F1EA]' : 'text-[#3E2723]'}`} fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="square" strokeLinejoin="miter">
@@ -1729,7 +1729,7 @@ function App() {
           <header className={`relative flex min-h-16 shrink-0 items-center justify-between border-b px-3 sm:px-6 py-2 flex-wrap gap-2 ${bgColor} ${isDinner ? 'border-[#334155]' : 'border-[#EAE5DA]'}`}>
               <div className="flex items-center gap-2 sm:gap-3">
                   <div className="flex aspect-square size-7 sm:size-8 items-center justify-center rounded-lg bg-[#F4F1EA] shrink-0 shadow-sm border border-[#EAE5DA]">
-                      <img src={aleaLogo} alt="ALEA Logo" className="w-[75%] h-[75%] object-contain" />
+                      <img src="/alea-logo.jpeg" alt="ALEA Logo" className="w-[75%] h-[75%] object-contain" />
                   </div>
                   <div className="flex items-center gap-2">
                       <svg viewBox="0 0 108 40" className={`h-3.5 sm:h-4 md:h-6 w-auto ${isDinner ? 'text-[#F4F1EA]' : 'text-[#3E2723]'}`} fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="square" strokeLinejoin="miter">
@@ -1904,7 +1904,7 @@ function App() {
                 <Separator orientation="vertical" className={`h-4 hidden md:block ${isDinner ? 'bg-[#334155]' : 'bg-[#D1CCC0]'}`} />
                 <div className="flex md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 items-center gap-2 sm:gap-3 md:gap-4">
                     <div className="flex aspect-square size-7 md:size-11 items-center justify-center rounded-lg bg-[#F4F1EA] shrink-0 shadow-sm border border-[#EAE5DA]">
-                      <img src={aleaLogo} alt="ALEA Logo" className="w-[75%] h-[75%] object-contain" />
+                      <img src="/alea-logo.jpeg" alt="ALEA Logo" className="w-[75%] h-[75%] object-contain" />
                     </div>
                     <div className="flex items-center gap-2 md:gap-3">
                       <svg viewBox="0 0 108 40" className={`h-3.5 sm:h-4 md:h-7 w-auto mt-0.5 ${isDinner ? 'text-[#F4F1EA]' : 'text-[#3E2723]'}`} fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="square" strokeLinejoin="miter">
