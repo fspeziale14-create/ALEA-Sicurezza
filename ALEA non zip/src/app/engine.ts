@@ -444,25 +444,36 @@ export function fasciaCam(cop: number, ratio: number = FASCIA): number {
 }
 
 export function convocazione(stima: number, rlo: number, rhi: number, ratio: number = FASCIA): ConvocazioneResult {
-  // Fascia sicurezza = ratio ideale × 1.20 (hardcoded, non configurabile)
-  // Soglia picco = 50% della fascia sicurezza (arrotondato per difetto)
   const fasciaS = ratio * 1.20;
   const sogliaPicko = Math.floor(fasciaS * 0.50);
-  const cam = fasciaCam(stima, fasciaS);
-  const soglia = cam * fasciaS;
-  const sforo = rhi - soglia;
-  if (sforo <= 0) {
-    return { cam_fissi: cam, cam_picco: 0, tipo: 'fissi',
-             messaggio: `${cam} ${cam === 1 ? 'cameriere' : 'camerieri'}`, alternativa: '' };
-  } else if (sforo <= sogliaPicko) {
-    return { cam_fissi: cam, cam_picco: 1, tipo: 'picco',
-             messaggio: `${cam} fissi + 1 picco`,
-             alternativa: `oppure ${cam + 1} fissi se picco prolungato` };
+
+  // cam base sulla fascia inferiore
+  const camHi = fasciaCam(stima, fasciaS);
+  const camLo = Math.max(1, camHi - 1);
+  const sogliaLo = camLo * fasciaS;
+  const sforoStima = stima - sogliaLo;  // quanto la stima sfora la soglia di camLo
+  const sforoRhi   = rhi   - sogliaLo;
+
+  if (sforoStima > sogliaPicko) {
+    // Stima sfora abbondantemente la fascia inferiore → fascia superiore
+    return { cam_fissi: camHi, cam_picco: 0, tipo: 'fissi_alto',
+             messaggio: `${camHi} ${camHi === 1 ? 'cameriere' : 'camerieri'}`,
+             alternativa: '' };
+  } else if (sforoStima > 0) {
+    // Stima sfora poco → camLo fissi + 1 picco
+    return { cam_fissi: camLo, cam_picco: 1, tipo: 'picco',
+             messaggio: `${camLo} fissi + 1 picco`,
+             alternativa: `oppure ${camLo + 1} fissi se picco prolungato` };
   } else {
-    const cam2 = fasciaCam(rhi, fasciaS);
-    return { cam_fissi: cam2, cam_picco: 0, tipo: 'fissi_alto',
-             messaggio: `${cam2} ${cam2 === 1 ? 'cameriere' : 'camerieri'} (range ampio)`,
-             alternativa: `oppure ${cam}+1 picco se picco breve` };
+    // Stima nella fascia — controlla rhi
+    if (sforoRhi > sogliaPicko) {
+      return { cam_fissi: camLo, cam_picco: 0, tipo: 'fissi',
+               messaggio: `${camLo} ${camLo === 1 ? 'cameriere' : 'camerieri'}`,
+               alternativa: `⚠️ range ampio — valuta +1 eventualmente durante il picco` };
+    }
+    return { cam_fissi: camLo, cam_picco: 0, tipo: 'fissi',
+             messaggio: `${camLo} ${camLo === 1 ? 'cameriere' : 'camerieri'}`,
+             alternativa: '' };
   }
 }
 
