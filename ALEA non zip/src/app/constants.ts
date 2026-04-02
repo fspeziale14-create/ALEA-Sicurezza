@@ -3,7 +3,7 @@
 // ========== COSTANTI ==========
 export const MENU_CATEGORIES = [
   { name: "APPETIZERS", items: ["Fritto della baia", "Gamberi coco loco", "Insalata caprese 'new style'", "Gold chicken nuggets", "Tostones & pulled beef", "Tostones & guacamole", "Tostones & gamberi al lime", "Party tostones", "Black bart mix"] },
-  { name: "PASTA & INSALATE", items: ["Spaghetti meatballs", "Tagliolini jolly roger", "Spaghetti all'astice", "Rasta pasta", "Caesar salad", "Chicken nuggets caesar salad", "Gamberi al lime bowl", "Quinoa salad", "Gamberi coco loco caesar salad"] },
+  { name: "PASTA & INSALATE", items: ["Spaghetti meatballs", "Tagliolini jolly roger", "Spaghetti all'astice", "Rasta pasta", "Chicken nuggets caesar salad", "Gamberi al lime bowl", "Quinoa salad", "Gamberi coco loco caesar salad"] },
   { name: "SANDWICH DELLA BAIA", items: ["Mamacita meatballs po'boy", "Gold chicken po'boy", "Pulled pork po'boy", "Pulled beef po'boy", "Coco loco shrimp po'boy", "Lobster roll", "Cajun lobster roll", "Shrimp roll", "Bay burger", "Bay cheese burger", "Bay bacon burger", "The pirates burger", "Halloumi burger"] },
   { name: "GLI SPECIAL DEL GOLFO", items: ["Shrimp creole", "Chicken creole", "Jambalaya", "Cuban-style pulled beef", "Pirates' fajitas", "Kraken curry", "Chicken curry", "Chicken caribe", "Jamaican jerk chicken"] },
   { name: "MAINS", items: ["Tagliata di manzo", "Tagliata bayou", "Barbarossa steak", "BBQ ribs", "Grilled salmon", "Mango tango salmon", "Tagliata di tonno", "Aloha tuna", "Fish & chips"] },
@@ -20,7 +20,7 @@ export const MENU_PRICES: Record<string, number> = {
   "Tostones & gamberi al lime": 6.8, "Party tostones": 13.9, "Black bart mix": 12.8,
   // PASTA & INSALATE
   "Spaghetti meatballs": 12.5, "Tagliolini jolly roger": 12.9, "Spaghetti all'astice": 19.8,
-  "Rasta pasta": 12.8, "Caesar salad": 13.4, "Chicken nuggets caesar salad": 13.4,
+  "Rasta pasta": 12.8, "Chicken nuggets caesar salad": 13.4,
   "Gamberi al lime bowl": 12.4, "Quinoa salad": 12.4, "Gamberi coco loco caesar salad": 13.4,
   // SANDWICH DELLA BAIA
   "Mamacita meatballs po'boy": 14.2, "Gold chicken po'boy": 14.5, "Pulled pork po'boy": 13.4,
