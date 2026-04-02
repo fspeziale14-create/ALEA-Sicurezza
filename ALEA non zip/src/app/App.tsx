@@ -11,6 +11,10 @@ import { Label } from './components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './components/ui/card';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from './components/ui/sidebar';
 import { DashboardSidebar } from './components/dashboard-sidebar';
+import { MenuProfitability } from './components/menu-profitability';
+import { DashboardView } from './DashboardView';
+import { PianificazioneView } from './PianificazioneView';
+import { ImpostazioniView } from './ImpostazioniView';
 import { Separator } from './components/ui/separator';
 
 // ── SUPABASE ──────────────────────────────────────────────────
@@ -52,6 +56,23 @@ interface Table {
 
 // ========== APP PRINCIPALE ==========
 function App() {
+
+
+  // ── CONVERSIONE UDM ─────────────────────────────────────────
+  const convertToUnit = (value: number, fromUnit: string, toUnit: string): number | null => {
+    if (fromUnit === toUnit) return value;
+    const liquidGroup = ['ml', 'l', 'cl'];
+    const weightGroup = ['g', 'kg'];
+    const inLiquid = liquidGroup.includes(fromUnit) && liquidGroup.includes(toUnit);
+    const inWeight = weightGroup.includes(fromUnit) && weightGroup.includes(toUnit);
+    if (!inLiquid && !inWeight) return null; // incompatibili
+    // Converti tutto in unità base (g o ml), poi verso target
+    const toBase: Record<string, number> = { g: 1, kg: 1000, ml: 1, l: 1000, cl: 10 };
+    const baseValue = value * toBase[fromUnit];
+    return baseValue / toBase[toUnit];
+  };
+  const isPieceUnit = (u: string) => u === 'pz';
+  const isMeasuredUnit = (u: string) => ['g', 'kg', 'ml', 'l', 'cl'].includes(u);
 
   // ====== AUTH & RUOLO ======
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
@@ -122,23 +143,44 @@ function App() {
   const [weather, setWeather] = useState<WeatherData>({ temp: 22, precipitation_mm: 0, condition: 'sunny' });
   
   // ====== IMPOSTAZIONI ======
-  const [waiterRatio, setWaiterRatio] = useState<number>(20); 
-  const [cookRatio, setCookRatio] = useState<number>(40); 
-  const [maxCapacity, setMaxCapacity] = useState<number>(150);
-  
-  const [pranzoStart, setPranzoStart] = useState<string>("12:00");
-  const [pranzoEnd, setPranzoEnd] = useState<string>("15:30");
-  const [cenaStart, setCenaStart] = useState<string>("19:00");
-  const [cenaEnd, setCenaEnd] = useState<string>("23:30");
-  
+  const [waiterRatio, setWaiterRatio] = useState<number>(() => {
+      try { const s = localStorage.getItem('alea_settings'); return s ? JSON.parse(s).waiterRatio ?? 20 : 20; } catch { return 20; }
+  });
+  const [cookRatio, setCookRatio] = useState<number>(() => {
+      try { const s = localStorage.getItem('alea_settings'); return s ? JSON.parse(s).cookRatio ?? 40 : 40; } catch { return 40; }
+  });
+  const [maxCapacity, setMaxCapacity] = useState<number>(() => {
+      try { const s = localStorage.getItem('alea_settings'); return s ? JSON.parse(s).maxCapacity ?? 150 : 150; } catch { return 150; }
+  });
+  const [pranzoStart, setPranzoStart] = useState<string>(() => {
+      try { const s = localStorage.getItem('alea_settings'); return s ? JSON.parse(s).pranzoStart ?? '12:00' : '12:00'; } catch { return '12:00'; }
+  });
+  const [pranzoEnd, setPranzoEnd] = useState<string>(() => {
+      try { const s = localStorage.getItem('alea_settings'); return s ? JSON.parse(s).pranzoEnd ?? '15:30' : '15:30'; } catch { return '15:30'; }
+  });
+  const [cenaStart, setCenaStart] = useState<string>(() => {
+      try { const s = localStorage.getItem('alea_settings'); return s ? JSON.parse(s).cenaStart ?? '19:00' : '19:00'; } catch { return '19:00'; }
+  });
+  const [cenaEnd, setCenaEnd] = useState<string>(() => {
+      try { const s = localStorage.getItem('alea_settings'); return s ? JSON.parse(s).cenaEnd ?? '23:30' : '23:30'; } catch { return '23:30'; }
+  });
   const [showDailyHours, setShowDailyHours] = useState(false);
-  
-  const [dailyHours, setDailyHours] = useState(
-      weekDaysOrdered.reduce((acc, day) => ({ 
-          ...acc, 
-          [day]: { pStart: '12:00', pEnd: '15:30', cStart: '19:00', cEnd: '23:30', isClosed: false } 
-      }), {} as Record<string, any>)
-  );
+  const [dailyHours, setDailyHours] = useState(() => {
+      try {
+          const s = localStorage.getItem('alea_settings');
+          return s && JSON.parse(s).dailyHours
+              ? JSON.parse(s).dailyHours
+              : weekDaysOrdered.reduce((acc, day) => ({
+                  ...acc,
+                  [day]: { pStart: '12:00', pEnd: '15:30', cStart: '19:00', cEnd: '23:30', isClosed: false }
+              }), {} as Record<string, any>);
+      } catch {
+          return weekDaysOrdered.reduce((acc, day) => ({
+              ...acc,
+              [day]: { pStart: '12:00', pEnd: '15:30', cStart: '19:00', cEnd: '23:30', isClosed: false }
+          }), {} as Record<string, any>);
+      }
+  });
 
   const handleGlobalHourChange = (shiftType: 'pStart' | 'pEnd' | 'cStart' | 'cEnd', value: string) => {
       if (shiftType === 'pStart') setPranzoStart(value);
@@ -163,8 +205,23 @@ function App() {
       return dailyHours[weekDaysOrdered[localDayIndex]];
   };
 
-  const [hostMode, setHostMode] = useState<'fisso' | 'dinamico'>('fisso');
-  const [hostRatio, setHostRatio] = useState<number>(50);
+  const [hostMode, setHostMode] = useState<'fisso' | 'dinamico'>(() => {
+      try { const s = localStorage.getItem('alea_settings'); return s ? JSON.parse(s).hostMode ?? 'fisso' : 'fisso'; } catch { return 'fisso'; }
+  });
+  const [hostRatio, setHostRatio] = useState<number>(() => {
+      try { const s = localStorage.getItem('alea_settings'); return s ? JSON.parse(s).hostRatio ?? 50 : 50; } catch { return 50; }
+  });
+  // Form preparazioni
+  const [prepTab, setPrepTab] = useState<'inventario' | 'ricette' | 'preparazioni'>('inventario');
+  const [newPrepName, setNewPrepName] = useState('');
+  const [newPrepYieldQty, setNewPrepYieldQty] = useState('');
+  const [newPrepYieldUnit, setNewPrepYieldUnit] = useState('g');
+  const [editingPrepId, setEditingPrepId] = useState<string | null>(null);
+  const [prepIngSearch, setPrepIngSearch] = useState('');
+  const [prepIngId, setPrepIngId] = useState('');
+  const [prepIngQty, setPrepIngQty] = useState('');
+  const [prepDropdownRect, setPrepDropdownRect] = useState<DOMRect | null>(null);
+  const [prepBatchQty, setPrepBatchQty] = useState<Record<string, string>>({});
 
   // ====== PRENOTAZIONI ======
   const [savedShifts, setSavedShifts] = useState<string[]>(() => {
@@ -203,17 +260,42 @@ function App() {
   // Ingredienti: { id, name, unit, idealQty, currentQty }
   const [ingredients, setIngredients] = useState<Array<{
       id: string; name: string; unit: string; idealQty: number; currentQty: number;
-  }>>([]);
-  // Ricette: { dishName, ingredients: [{ ingredientId, qty }] }
-  const [recipes, setRecipes] = useState<Record<string, Array<{ ingredientId: string; qty: number }>>>({});
+      suppliers?: Array<{ name: string; qtyPerBox: number; pricePerBox: number; unit: string }>;
+      manualPricePerUnit?: number;
+      // WAC: storico acquisti { qty in unità base, pricePerUnit in €/unità base, date }
+      purchaseHistory?: Array<{ qty: number; pricePerUnit: number; date: string; supplierName: string }>;
+  }>>(() => {
+      try { const s = localStorage.getItem('alea_ingredients'); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+  // Ricette: { dishName, ingredients: [{ ingredientId, qty, pcs_yield? }] }
+  const [recipes, setRecipes] = useState<Record<string, Array<{ ingredientId: string; qty: number; pcs_yield?: number }>>>(() => {
+      try { const s = localStorage.getItem('alea_recipes'); return s ? JSON.parse(s) : {}; } catch { return {}; }
+  });
+  // Preparazioni interne: semi-lavorati fatti in casa
+  const [preparations, setPreparations] = useState<Array<{
+      id: string; name: string; yieldQty: number; yieldUnit: string;
+      ingredients: Array<{ ingredientId: string; qty: number }>;
+  }>>(() => {
+      try { const s = localStorage.getItem('alea_preparations'); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
   // Form aggiunta ingrediente
   const [newIngName, setNewIngName] = useState('');
   const [newIngUnit, setNewIngUnit] = useState('g');
   const [newIngIdeal, setNewIngIdeal] = useState('');
+  // Form fornitore
+  const [newIngSupplierMode, setNewIngSupplierMode] = useState<'new' | 'existing'>('new');
+  const [newIngSupplierName, setNewIngSupplierName] = useState('');
+  const [newIngQtyPerBox, setNewIngQtyPerBox] = useState('');
+  const [newIngBoxCount, setNewIngBoxCount] = useState('');
+  const [newIngSelectedSupplier, setNewIngSelectedSupplier] = useState('');
+  const [newIngEditingIdeal, setNewIngEditingIdeal] = useState(false);
+  const [newIngPricePerBox, setNewIngPricePerBox] = useState('');
+  const [newIngEditingPrice, setNewIngEditingPrice] = useState(false);
   // Ricetta in modifica
   const [editingRecipeDish, setEditingRecipeDish] = useState<string | null>(null);
   const [editingRecipeIngId, setEditingRecipeIngId] = useState('');
   const [editingRecipeQty, setEditingRecipeQty] = useState('');
+  const [editingRecipePcsYield, setEditingRecipePcsYield] = useState('');
   const [ingredientSearchText, setIngredientSearchText] = useState('');
   const [dropdownRect, setDropdownRect] = useState<DOMRect | null>(null);
   // Verifica quantità
@@ -221,7 +303,7 @@ function App() {
   const [verifyValues, setVerifyValues] = useState<Record<string, string>>({});
   const [importFeedback, setImportFeedback] = useState<{ type: 'success' | 'error' | 'info'; msg: string } | null>(null);
   // Tab pianificazione aggiornata
-  const [planTab, setPlanTab] = useState<'sala' | 'inventario' | 'cucina'>('sala');
+  const [planTab, setPlanTab] = useState<'sala' | 'inventario' | 'preparazioni' | 'cucina'>('sala');
 
   // ====== TAVOLI (STATO CONDIVISO TRA GESTIONALE E PERSONALE) ======
   const [tables, setTables] = useState<Table[]>([
@@ -335,6 +417,29 @@ function App() {
       const interval = setInterval(() => setTick(t => t + 1), 60000);
       return () => clearInterval(interval);
   }, [activeTableId]);
+
+  // ====== PERSISTENZA LOCALSTORAGE ======
+  useEffect(() => {
+      try { localStorage.setItem('alea_ingredients', JSON.stringify(ingredients)); } catch {}
+  }, [ingredients]);
+
+  useEffect(() => {
+      try { localStorage.setItem('alea_recipes', JSON.stringify(recipes)); } catch {}
+  }, [recipes]);
+
+  useEffect(() => {
+      try { localStorage.setItem('alea_preparations', JSON.stringify(preparations)); } catch {}
+  }, [preparations]);
+
+  useEffect(() => {
+      try {
+          localStorage.setItem('alea_settings', JSON.stringify({
+              waiterRatio, cookRatio, maxCapacity,
+              pranzoStart, pranzoEnd, cenaStart, cenaEnd,
+              dailyHours, hostMode, hostRatio
+          }));
+      } catch {}
+  }, [waiterRatio, cookRatio, maxCapacity, pranzoStart, pranzoEnd, cenaStart, cenaEnd, dailyHours]);
 
   // ====== GENERATORI ======
   const generateStaffPlan = async () => {
@@ -1966,925 +2071,119 @@ function App() {
 
           {/* ========== PIANIFICAZIONE ========== */}
           {activeView === "Pianificazione" && (
-             <main className="flex-1 p-6 md:p-8 max-w-6xl mx-auto w-full">
-                <div className="space-y-6">
-                    <div className="flex flex-col md:flex-row justify-between md:items-end gap-4">
-                        <div>
-                            <h1 className={`text-3xl font-bold tracking-tight ${textColor}`}>Pianificazione Strategica</h1>
-                            <p className={`${mutedText} mt-1`}>Genera le previsioni AI basate su 14 mesi di storico puro e meteo.</p>
-                        </div>
-                        
-                        {planTab === 'sala' ? (
-                            <Button onClick={generateStaffPlan} disabled={isGeneratingStaff} className={`px-6 py-6 text-base font-semibold shadow-md disabled:opacity-70 bg-[#967D62] hover:bg-[#7A654E] ${isDinner ? 'text-[#F4F1EA]' : 'text-white'}`}>
-                                {isGeneratingStaff ? (<Loader2 className="w-5 h-5 mr-2 animate-spin" />) : (<CalendarRange className="w-5 h-5 mr-2" />)}
-                                Genera Turni Settimana
-                            </Button>
-                        ) : planTab === 'cucina' ? (
-                            <Button onClick={generateBudgetPlan} disabled={isGeneratingBudget} className={`px-6 py-6 text-base font-semibold shadow-md disabled:opacity-70 bg-[#967D62] hover:bg-[#7A654E] ${isDinner ? 'text-[#F4F1EA]' : 'text-white'}`}>
-                                {isGeneratingBudget ? (<Loader2 className="w-5 h-5 mr-2 animate-spin" />) : (<Boxes className="w-5 h-5 mr-2" />)}
-                                Calcola Fabbisogno Periodo
-                            </Button>
-                        ) : null}
-                    </div>
-
-                    <div className={`flex p-1 rounded-lg border w-fit mb-6 ${isDinner ? 'bg-[#0F172A] border-[#334155]' : 'bg-black/5 border-[#EAE5DA]'}`}>
-                        <button onClick={() => setPlanTab('sala')} className={`px-6 py-2 rounded-md text-sm font-semibold transition-all flex items-center gap-2 ${planTab === 'sala' ? (isDinner ? 'bg-[#334155] text-[#F4F1EA] shadow-sm border border-[#475569]' : 'bg-white text-[#967D62] shadow-sm') : (isDinner ? 'text-[#94A3B8] hover:text-[#F4F1EA]' : 'text-[#8C8A85] hover:text-[#2C2A28]')}`}>
-                            <Users className="w-4 h-4" /> Convocazioni Sala
-                        </button>
-                        <button onClick={() => setPlanTab('inventario')} className={`px-6 py-2 rounded-md text-sm font-semibold transition-all flex items-center gap-2 ${planTab === 'inventario' ? (isDinner ? 'bg-[#334155] text-[#F4F1EA] shadow-sm border border-[#475569]' : 'bg-white text-[#967D62] shadow-sm') : (isDinner ? 'text-[#94A3B8] hover:text-[#F4F1EA]' : 'text-[#8C8A85] hover:text-[#2C2A28]')}`}>
-                            <ClipboardList className="w-4 h-4" /> Inventario
-                        </button>
-                        <button onClick={() => setPlanTab('cucina')} className={`px-6 py-2 rounded-md text-sm font-semibold transition-all flex items-center gap-2 ${planTab === 'cucina' ? (isDinner ? 'bg-[#334155] text-[#F4F1EA] shadow-sm border border-[#475569]' : 'bg-white text-[#967D62] shadow-sm') : (isDinner ? 'text-[#94A3B8] hover:text-[#F4F1EA]' : 'text-[#8C8A85] hover:text-[#2C2A28]')}`}>
-                            <Boxes className="w-4 h-4" /> Volumi e Budget
-                        </button>
-                    </div>
-
-                    {planTab === 'inventario' && (
-                        <div className="space-y-6">
-                            {/* RIGA DUE COLONNE: Magazzino + Ricette */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-                                {/* ===== COLONNA 1: MAGAZZINO ===== */}
-                                <Card className={cardBg}>
-                                    <CardHeader>
-                                        <CardTitle className={`flex items-center gap-2 ${textColor}`}><ClipboardList className={`w-5 h-5 ${accentColor}`} /> Magazzino</CardTitle>
-                                        <CardDescription className={mutedText}>Inserisci gli ingredienti con quantità ideale e attuale.</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        {/* Form aggiunta ingrediente */}
-                                        <div className={`p-4 rounded-xl border space-y-3 ${isDinner ? 'bg-[#0F172A] border-[#334155]' : 'bg-gray-50 border-[#EAE5DA]'}`}>
-                                            <h4 className={`text-xs font-bold uppercase tracking-wider ${mutedText}`}>Aggiungi Ingrediente</h4>
-                                            <div className="flex gap-2">
-                                                <Input placeholder="Nome (es. Farina)" value={newIngName} onChange={e => setNewIngName(e.target.value)} className={`flex-1 ${isDinner ? 'border-[#334155] bg-[#1E293B]' : 'border-[#EAE5DA]'}`} />
-                                                <select value={newIngUnit} onChange={e => setNewIngUnit(e.target.value)} className={`w-20 rounded-md border text-sm px-2 ${isDinner ? 'border-[#334155] bg-[#1E293B] text-[#F4F1EA]' : 'border-[#EAE5DA] bg-white text-[#2C2A28]'}`}>
-                                                    {['g', 'kg', 'ml', 'l', 'pz', 'cl'].map(u => <option key={u} value={u}>{u}</option>)}
-                                                </select>
-                                            </div>
-                                            <div className="flex gap-2 items-end">
-                                                <div className="flex-1 space-y-1">
-                                                    <Label className={`text-xs ${mutedText}`}>Quantità Ideale</Label>
-                                                    <Input type="number" placeholder="Es. 5000" value={newIngIdeal} onChange={e => setNewIngIdeal(e.target.value)} className={isDinner ? 'border-[#334155] bg-[#1E293B]' : 'border-[#EAE5DA]'} />
-                                                </div>
-                                                <Button onClick={() => {
-                                                    if (!newIngName || !newIngIdeal) return;
-                                                    const id = Date.now().toString();
-                                                    setIngredients(prev => [...prev, { id, name: newIngName, unit: newIngUnit, idealQty: Number(newIngIdeal), currentQty: Number(newIngIdeal) }]);
-                                                    setNewIngName(''); setNewIngIdeal('');
-                                                }} className="bg-[#967D62] hover:bg-[#7A654E] text-white px-4">
-                                                    <Plus className="w-4 h-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
-
-                                        {/* Lista ingredienti */}
-                                        {ingredients.length === 0 ? (
-                                            <p className={`text-sm text-center py-4 ${mutedText}`}>Nessun ingrediente inserito.</p>
-                                        ) : (
-                                            <div className="space-y-2 max-h-80 overflow-y-auto">
-                                                {ingredients.map(ing => {
-                                                    const pct = ing.idealQty > 0 ? (ing.currentQty / ing.idealQty) * 100 : 100;
-                                                    const color = pct > 50 ? 'bg-emerald-500' : pct > 20 ? 'bg-amber-500' : 'bg-red-500';
-                                                    return (
-                                                        <div key={ing.id} className={`p-3 rounded-lg border ${isDinner ? 'bg-[#0F172A] border-[#334155]' : 'bg-gray-50 border-[#EAE5DA]'}`}>
-                                                            <div className="flex justify-between items-center mb-1">
-                                                                <span className={`font-semibold text-sm ${textColor}`}>{ing.name}</span>
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className={`text-sm font-mono ${pct < 20 ? 'text-red-500' : pct < 50 ? 'text-amber-500' : 'text-emerald-500'}`}>{ing.currentQty}{ing.unit} / {ing.idealQty}{ing.unit}</span>
-                                                                    <button onClick={() => setIngredients(prev => prev.filter(i => i.id !== ing.id))} className="text-red-400 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>
-                                                                </div>
-                                                            </div>
-                                                            <div className={`w-full h-1.5 rounded-full ${isDinner ? 'bg-[#334155]' : 'bg-gray-200'}`}>
-                                                                <div className={`h-1.5 rounded-full transition-all ${color}`} style={{ width: `${Math.min(100, pct)}%` }} />
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-
-                                        {/* Verifica Quantità */}
-                                        {ingredients.length > 0 && (
-                                            <div className="pt-2">
-                                                <Button onClick={() => { setShowVerifyForm(v => !v); setVerifyValues({}); }} variant="outline" className={`w-full ${isDinner ? 'border-[#334155] text-[#F4F1EA] hover:bg-[#334155]' : 'border-[#EAE5DA] hover:bg-gray-50'}`}>
-                                                    <CheckCircle2 className="w-4 h-4 mr-2" /> Verifica Quantità
-                                                </Button>
-                                                {showVerifyForm && (
-                                                    <div className={`mt-3 p-4 rounded-xl border space-y-3 ${isDinner ? 'bg-[#0F172A] border-[#334155]' : 'bg-gray-50 border-[#EAE5DA]'}`}>
-                                                        <h4 className={`text-xs font-bold uppercase tracking-wider ${mutedText}`}>Inserisci le quantità reali trovate</h4>
-                                                        {ingredients.map(ing => (
-                                                            <div key={ing.id} className="flex items-center gap-3">
-                                                                <span className={`flex-1 text-sm ${textColor}`}>{ing.name}</span>
-                                                                <Input type="number" placeholder={`${ing.currentQty}`} value={verifyValues[ing.id] || ''} onChange={e => setVerifyValues(prev => ({ ...prev, [ing.id]: e.target.value }))} className={`w-28 text-right ${isDinner ? 'border-[#334155] bg-[#1E293B]' : 'border-[#EAE5DA]'}`} />
-                                                                <span className={`text-xs w-6 ${mutedText}`}>{ing.unit}</span>
-                                                            </div>
-                                                        ))}
-                                                        <Button onClick={() => {
-                                                            setIngredients(prev => prev.map(ing => {
-                                                                const real = verifyValues[ing.id];
-                                                                if (real === undefined || real === '') return ing;
-                                                                return { ...ing, currentQty: Number(real) };
-                                                            }));
-                                                            setShowVerifyForm(false);
-                                                            setVerifyValues({});
-                                                        }} className="w-full bg-[#967D62] hover:bg-[#7A654E] text-white">
-                                                            Salva Verifica
-                                                        </Button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* Carica modulo dati */}
-                                        <div className="pt-3 mt-1 border-t border-black/5 dark:border-white/5">
-                                            {importFeedback && (
-                                                <div className={`mb-2 px-3 py-2 rounded-lg text-xs font-medium ${
-                                                    importFeedback.type === 'success' ? 'bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400' :
-                                                    importFeedback.type === 'error'   ? 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400' :
-                                                    'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400'
-                                                }`}>{importFeedback.msg}</div>
-                                            )}
-                                            <label className={`flex items-center justify-center gap-2 w-full px-3 py-2 rounded-lg border border-dashed cursor-pointer text-xs font-medium transition-colors ${isDinner ? 'border-[#334155] text-[#94A3B8] hover:bg-[#334155]/30' : 'border-[#D1C9BC] text-[#8C8A85] hover:bg-gray-50'}`}>
-                                                <Boxes className="w-3.5 h-3.5" />
-                                                Carica modulo dati
-                                                <span className={`text-[10px] ${mutedText}`}>(CSV, XLSX, XLS, TSV)</span>
-                                                <input type="file" accept=".csv,.xlsx,.xls,.tsv,.txt" onChange={handleInventoryImport} className="hidden" />
-                                            </label>
-                                            <p className={`text-[10px] mt-1.5 text-center ${mutedText}`}>
-                                                Il file deve avere colonne: <span className="font-mono">nome</span>, <span className="font-mono">quantità</span> (e opzionale <span className="font-mono">unità</span>).
-                                            </p>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-
-                                {/* ===== COLONNA 2: RICETTE ===== */}
-                                <Card className={cardBg}>
-                                    <CardHeader>
-                                        <CardTitle className={`flex items-center gap-2 ${textColor}`}><BookOpen className={`w-5 h-5 ${accentColor}`} /> Quantità per Piatto</CardTitle>
-                                        <CardDescription className={mutedText}>Per ogni piatto, indica gli ingredienti usati e le quantità per porzione.</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        {ingredients.length === 0 ? (
-                                            <p className={`text-sm text-center py-4 ${mutedText}`}>Aggiungi prima gli ingredienti nel Magazzino.</p>
-                                        ) : (
-                                            <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
-                                                {MENU_CATEGORIES.flatMap(cat => cat.items).map(dish => {
-                                                    const dishRecipe = recipes[dish] || [];
-                                                    const isEditing = editingRecipeDish === dish;
-                                                    return (
-                                                        <div key={dish} className={`rounded-lg border overflow-hidden ${isDinner ? 'border-[#334155]' : 'border-[#EAE5DA]'}`}>
-                                                            <button onClick={() => setEditingRecipeDish(isEditing ? null : dish)} className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-semibold transition-colors ${isEditing ? (isDinner ? 'bg-[#334155] text-[#F4F1EA]' : 'bg-gray-100 text-[#2C2A28]') : (isDinner ? 'bg-[#1E293B] text-[#94A3B8] hover:bg-[#334155]' : 'bg-white text-[#8C8A85] hover:bg-gray-50')}`}>
-                                                                <span>{dish}</span>
-                                                                <span className="flex items-center gap-2">
-                                                                    {dishRecipe.length > 0 && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isDinner ? 'bg-[#967D62]/20 text-[#967D62]' : 'bg-[#967D62]/10 text-[#967D62]'}`}>{dishRecipe.length} ing.</span>}
-                                                                    {isEditing ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                                                                </span>
-                                                            </button>
-                                                            {isEditing && (
-                                                                <div className={`p-3 space-y-2 ${isDinner ? 'bg-[#0F172A]' : 'bg-gray-50'}`}>
-                                                                    {/* ingredienti già aggiunti */}
-                                                                    {dishRecipe.map(({ ingredientId, qty }) => {
-                                                                        const ing = ingredients.find(i => i.id === ingredientId);
-                                                                        return ing ? (
-                                                                            <div key={ingredientId} className="flex items-center justify-between text-xs">
-                                                                                <span className={textColor}>{ing.name}</span>
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <span className={mutedText}>{qty}{ing.unit}</span>
-                                                                                    <button onClick={() => setRecipes(prev => ({ ...prev, [dish]: (prev[dish] || []).filter(r => r.ingredientId !== ingredientId) }))} className="text-red-400 hover:text-red-500"><X className="w-3 h-3" /></button>
-                                                                                </div>
-                                                                            </div>
-                                                                        ) : null;
-                                                                    })}
-                                                                    {/* form aggiunta ingrediente a ricetta */}
-                                                                    <div className="flex gap-2 pt-1">
-                                                                        <div className="flex-1 relative">
-                                                                            <Input
-                                                                                placeholder="Cerca ingrediente..."
-                                                                                value={editingRecipeIngId && ingredients.find(i => i.id === editingRecipeIngId)
-                                                                                    ? ingredients.find(i => i.id === editingRecipeIngId)!.name
-                                                                                    : ingredientSearchText}
-                                                                                onChange={e => {
-                                                                                    setIngredientSearchText(e.target.value);
-                                                                                    setEditingRecipeIngId('');
-                                                                                }}
-                                                                                onFocus={e => setDropdownRect(e.currentTarget.getBoundingClientRect())}
-                                                                                onBlur={() => setTimeout(() => setDropdownRect(null), 150)}
-                                                                                className={`text-xs ${isDinner ? 'border-[#334155] bg-[#1E293B] text-[#F4F1EA]' : 'border-[#EAE5DA] bg-white text-[#2C2A28]'}`}
-                                                                            />
-                                                                            {dropdownRect && !editingRecipeIngId && ingredientSearchText && ingredients.filter(i => !recipes[dish]?.some(r => r.ingredientId === i.id) && i.name.toLowerCase().includes(ingredientSearchText.toLowerCase())).length > 0 && (
-                                                                                <div
-                                                                                    className={`fixed z-[9999] rounded-lg border shadow-xl overflow-y-auto ${isDinner ? 'bg-[#1E293B] border-[#334155]' : 'bg-white border-[#EAE5DA]'}`}
-                                                                                    style={{ top: dropdownRect.bottom + 4, left: dropdownRect.left, width: dropdownRect.width, maxHeight: 200 }}
-                                                                                >
-                                                                                    {ingredients.filter(i => !recipes[dish]?.some(r => r.ingredientId === i.id) && i.name.toLowerCase().includes(ingredientSearchText.toLowerCase())).map(i => (
-                                                                                        <button
-                                                                                            key={i.id}
-                                                                                            onMouseDown={e => { e.preventDefault(); setEditingRecipeIngId(i.id); setIngredientSearchText(''); setDropdownRect(null); }}
-                                                                                            className={`w-full text-left px-3 py-2 text-xs font-medium transition-colors ${isDinner ? 'text-[#F4F1EA] hover:bg-[#334155]' : 'text-[#2C2A28] hover:bg-gray-50'}`}
-                                                                                        >
-                                                                                            {i.name} <span className={mutedText}>({i.unit})</span>
-                                                                                        </button>
-                                                                                    ))}
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                        <Input type="number" placeholder="Qty" value={editingRecipeQty} onChange={e => setEditingRecipeQty(e.target.value)} className={`w-16 text-xs ${isDinner ? 'border-[#334155] bg-[#1E293B]' : 'border-[#EAE5DA]'}`} />
-                                                                        <button onClick={() => {
-                                                                            const validId = ingredients.find(i => i.id === editingRecipeIngId)?.id;
-                                                                            if (!validId || !editingRecipeQty) return;
-                                                                            setRecipes(prev => ({ ...prev, [dish]: [...(prev[dish] || []), { ingredientId: validId, qty: Number(editingRecipeQty) }] }));
-                                                                            setEditingRecipeIngId(''); setEditingRecipeQty(''); setIngredientSearchText('');
-                                                                        }} className="px-2 py-1 rounded-md bg-[#967D62] text-white text-xs font-bold hover:bg-[#7A654E]">
-                                                                            <Plus className="w-3 h-3" />
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </div>
-                        </div>
-                    )}
-
-                    {planTab === 'sala' && (
-                        <>
-                            {!weekGenerated ? (
-                                <div className={`mt-8 text-center p-12 border-2 border-dashed rounded-2xl ${isDinner ? 'border-[#334155] bg-[#0F172A]' : 'border-[#EAE5DA] bg-gray-50'}`}>
-                                    <Users className={`w-16 h-16 mx-auto mb-4 opacity-50 ${mutedText}`} />
-                                    <h3 className={`text-lg font-bold ${textColor}`}>Nessuna settimana generata</h3>
-                                    <p className={`${mutedText} mt-2`}>Premi il pulsante per generare la programmazione da Lunedì a Domenica.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <div className={`p-4 rounded-xl border ${accentBg} flex items-center justify-center`}>
-                                        <span className={`font-bold ${accentColor} uppercase tracking-wider`}>Programmazione dal {staffDateRange.start} al {staffDateRange.end}</span>
-                                    </div>
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                                        {weeklyStaffData.map((dayData, idx) => {
-                                            const avviso = getFestivitaAvviso(dayData.data || '');
-                                            const att: AttendibilitaResult = dayData.attendibilita ?? { livello: 'buona', motivazione: '', colore: 'bg-yellow-400', coloreBar: '#facc15' };
-                                            const livelloLabel = att.livello.charAt(0).toUpperCase() + att.livello.slice(1);
-                                            return (
-                                            <Card key={idx} className={`${cardBg} overflow-hidden flex flex-col`}>
-                                                <CardHeader className="pb-3 border-b border-black/5 dark:border-white/5">
-                                                    <CardTitle className={`flex justify-between items-center ${textColor}`}>
-                                                        <div className="flex flex-col">
-                                                            <span>{dayData.dayName}</span>
-                                                            <span className={`text-xs font-normal ${mutedText}`}>{dayData.shortDate}</span>
-                                                        </div>
-                                                        {dayData.isWeekend && (<span className={`text-[10px] ${isDinner ? 'bg-[#967D62] text-[#F4F1EA]' : 'bg-[#967D62] text-white'} px-2 py-0.5 rounded-full uppercase`}>Weekend</span>)}
-                                                    </CardTitle>
-                                                    {avviso && (
-                                                        <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800">
-                                                            <p className="text-xs text-amber-700 dark:text-amber-400 leading-snug">{avviso}</p>
-                                                        </div>
-                                                    )}
-                                                </CardHeader>
-                                                <CardContent className="p-0 flex-1 flex flex-col">
-
-                                                    {/* ── PRANZO ─────────────────────────────── */}
-                                                    <div className="p-4 border-b border-black/5 dark:border-white/5">
-                                                        <div className={`flex items-center gap-2 text-sm font-bold mb-3 ${accentColor}`}><Sun className="w-4 h-4" /> PRANZO</div>
-                                                        <div className="space-y-1.5">
-                                                            <div className="flex justify-between items-center text-sm">
-                                                                <span className={mutedText}>Previsti</span>
-                                                                <span className={`font-bold ${textColor}`}>{dayData.pranzo.predicted ?? '—'} <span className={`text-xs font-normal ${mutedText}`}>({dayData.pranzo.lo}–{dayData.pranzo.hi})</span></span>
-                                                            </div>
-
-                                                            {/* Personale */}
-                                                            <div className={`pt-1.5 mt-1.5 border-t ${isDinner ? 'border-white/5' : 'border-black/5'}`}>
-                                                                <div className={`flex items-center gap-1.5 mb-1.5 text-xs font-bold uppercase tracking-wider ${mutedText}`}>
-                                                                    <Users className="w-3 h-3" /> Personale
-                                                                </div>
-                                                                <div className="flex justify-between items-center text-sm">
-                                                                    <span className={mutedText}>Turno Base</span>
-                                                                    <span className={`font-bold ${textColor}`}>{dayData.pranzo.staff.base} Fissi</span>
-                                                                </div>
-                                                                {dayData.pranzo.staff.onCall > 0 && (
-                                                                    <div className="flex justify-between items-center text-sm bg-black/5 dark:bg-white/5 px-2 py-1.5 rounded-md mt-1">
-                                                                        <span className={`${accentColor} font-semibold flex items-center gap-1`}><TrendingUp className="w-3 h-3" /> Rinforzo Picco</span>
-                                                                        <span className={`font-bold ${accentColor}`}>+{dayData.pranzo.staff.onCall} Chiamata</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-
-                                                            {/* Cucina */}
-                                                            {dayData.pranzo.cuochi && (
-                                                                <div className={`pt-1.5 mt-1 border-t ${isDinner ? 'border-white/5' : 'border-black/5'}`}>
-                                                                    <div className={`flex items-center gap-1.5 mb-1.5 text-xs font-bold uppercase tracking-wider ${mutedText}`}>
-                                                                        <ChefHat className="w-3 h-3" /> Cucina
-                                                                    </div>
-                                                                    <div className="flex justify-between items-center text-sm">
-                                                                        <span className={mutedText}>Turno Cucina</span>
-                                                                        <span className={`font-bold ${textColor}`}>{dayData.pranzo.cuochi.messaggio}</span>
-                                                                    </div>
-                                                                    {dayData.pranzo.cuochi.nota ? (
-                                                                        <p className={`text-xs mt-1 ${accentColor}`}>{dayData.pranzo.cuochi.nota}</p>
-                                                                    ) : null}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* ── CENA ───────────────────────────────── */}
-                                                    <div className="p-4 flex-1">
-                                                        <div className={`flex items-center gap-2 text-sm font-bold mb-3 ${accentColor}`}><Moon className="w-4 h-4" /> CENA</div>
-                                                        <div className="space-y-1.5">
-                                                            <div className="flex justify-between items-center text-sm">
-                                                                <span className={mutedText}>Previsti</span>
-                                                                <span className={`font-bold ${textColor}`}>{dayData.cena.predicted ?? '—'} <span className={`text-xs font-normal ${mutedText}`}>({dayData.cena.lo}–{dayData.cena.hi})</span></span>
-                                                            </div>
-
-                                                            {/* Personale */}
-                                                            <div className={`pt-1.5 mt-1.5 border-t ${isDinner ? 'border-white/5' : 'border-black/5'}`}>
-                                                                <div className={`flex items-center gap-1.5 mb-1.5 text-xs font-bold uppercase tracking-wider ${mutedText}`}>
-                                                                    <Users className="w-3 h-3" /> Personale
-                                                                </div>
-                                                                <div className="flex justify-between items-center text-sm">
-                                                                    <span className={mutedText}>Turno Base</span>
-                                                                    <span className={`font-bold ${textColor}`}>{dayData.cena.staff.base} Fissi</span>
-                                                                </div>
-                                                                {dayData.cena.staff.onCall > 0 && (
-                                                                    <div className="flex justify-between items-center text-sm bg-black/5 dark:bg-white/5 px-2 py-1.5 rounded-md mt-1">
-                                                                        <span className={`${accentColor} font-semibold flex items-center gap-1`}><TrendingUp className="w-3 h-3" /> Rinforzo Picco</span>
-                                                                        <span className={`font-bold ${accentColor}`}>+{dayData.cena.staff.onCall} Chiamata</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-
-                                                            {/* Cucina */}
-                                                            {dayData.cena.cuochi && (
-                                                                <div className={`pt-1.5 mt-1 border-t ${isDinner ? 'border-white/5' : 'border-black/5'}`}>
-                                                                    <div className={`flex items-center gap-1.5 mb-1.5 text-xs font-bold uppercase tracking-wider ${mutedText}`}>
-                                                                        <ChefHat className="w-3 h-3" /> Cucina
-                                                                    </div>
-                                                                    <div className="flex justify-between items-center text-sm">
-                                                                        <span className={mutedText}>Turno Cucina</span>
-                                                                        <span className={`font-bold ${textColor}`}>{dayData.cena.cuochi.messaggio}</span>
-                                                                    </div>
-                                                                    {dayData.cena.cuochi.nota ? (
-                                                                        <p className={`text-xs mt-1 ${accentColor}`}>{dayData.cena.cuochi.nota}</p>
-                                                                    ) : null}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* ── BARRA ATTENDIBILITÀ ─────────────────── */}
-                                                    <div className="mt-auto">
-                                                        <div className={`px-4 py-2 flex items-center justify-between border-t ${isDinner ? 'border-white/5' : 'border-black/5'}`}>
-                                                            <span className={`text-[10px] font-semibold uppercase tracking-wider ${mutedText}`}>Attendibilità</span>
-                                                            <span className="text-[10px] font-bold" style={{ color: att.coloreBar }}>{livelloLabel}</span>
-                                                        </div>
-                                                        <div title={att.motivazione} className="h-1.5 w-full rounded-b-lg" style={{ backgroundColor: att.coloreBar }} />
-                                                    </div>
-
-                                                </CardContent>
-                                            </Card>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-                        </>
-                    )}
-
-                    {planTab === 'cucina' && (
-                        <div className="space-y-6">
-                            <Card className={cardBg}>
-                                <CardHeader className="pb-3 border-b border-black/5 dark:border-white/5 flex flex-row items-center justify-between">
-                                    <div>
-                                        <CardTitle className={`text-lg ${textColor}`}>Impostazioni Periodo Ordine</CardTitle>
-                                        <CardDescription className={mutedText}>Seleziona da quando e per quanti giorni calcolare la spesa.</CardDescription>
-                                    </div>
-                                    <Button variant="ghost" size="icon" onClick={() => setShowBudgetSettings(!showBudgetSettings)} className={`${showBudgetSettings ? (isDinner ? 'bg-[#967D62] text-[#F4F1EA]' : 'bg-[#967D62] text-white') : ''}`}>
-                                        <Settings2 className="w-5 h-5" />
-                                    </Button>
-                                </CardHeader>
-                                {showBudgetSettings && (
-                                    <CardContent className="pt-6 flex flex-col sm:flex-row gap-6 items-end">
-                                        <div className="space-y-2 w-full sm:w-auto">
-                                            <Label className={textColor}>Data Inizio Periodo</Label>
-                                            <Input type="date" value={budgetStartDate} onChange={e => setBudgetStartDate(e.target.value)} className={isDinner ? 'border-[#334155] bg-[#0F172A] [color-scheme:dark]' : 'border-[#EAE5DA] bg-white'} />
-                                        </div>
-                                        <div className="space-y-2 w-full sm:w-32">
-                                            <Label className={textColor}>Durata (Giorni)</Label>
-                                            <Input type="number" min="1" max="30" value={budgetDuration} onChange={e => setBudgetDuration(parseInt(e.target.value))} className={isDinner ? 'border-[#334155] bg-[#0F172A]' : 'border-[#EAE5DA] bg-white'} />
-                                        </div>
-                                    </CardContent>
-                                )}
-                            </Card>
-
-                            {!budgetGenerated ? (
-                                <div className={`mt-8 text-center p-12 border-2 border-dashed rounded-2xl ${isDinner ? 'border-[#334155] bg-[#0F172A]' : 'border-[#EAE5DA] bg-gray-50'}`}>
-                                    <Boxes className={`w-16 h-16 mx-auto mb-4 opacity-50 ${mutedText}`} />
-                                    <h3 className={`text-lg font-bold ${textColor}`}>Nessun budget calcolato</h3>
-                                    <p className={`${mutedText} mt-2`}>Usa l'ingranaggio per scegliere le date, poi premi Calcola Fabbisogno.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-6">
-                                    <div className="text-center pb-4">
-                                        <h2 className={`text-2xl font-bold ${textColor}`}>Volumi dal {budgetData.startDate} al {budgetData.endDate}</h2>
-                                        <p className={mutedText}>Totale aggregato per i prossimi {budgetDuration} giorni</p>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <div className={`p-8 rounded-2xl border-2 ${isDinner ? 'border-[#334155] bg-[#1E293B]' : 'border-[#EAE5DA] bg-white shadow-sm'}`}>
-                                            <div className={`flex items-center justify-center gap-2 text-xl font-black mb-6 ${accentColor}`}><Sun className="w-6 h-6" /> FABBISOGNO PRANZO</div>
-                                            <div className="flex flex-col items-center text-center mb-8">
-                                                <span className={`text-6xl font-black tracking-tighter tabular-nums ${textColor}`}>{budgetData.pranzo.stimati}</span>
-                                                <span className={`uppercase font-bold tracking-widest text-sm mt-2 ${mutedText}`}>Coperti Previsti</span>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 p-4 rounded-xl flex flex-col items-center">
-                                                    <span className={`${mutedText} text-xs font-bold uppercase tracking-wider`}>Coperti Minimi</span>
-                                                    <span className={`${textColor} text-2xl font-black mt-1`}>{budgetData.pranzo.min}</span>
-                                                </div>
-                                                <div className={`${accentBg} p-4 rounded-xl flex flex-col items-center`}>
-                                                    <span className={`${accentColor} text-xs font-bold uppercase tracking-wider`}>Coperti Massimi</span>
-                                                    <span className={`${accentColor} text-2xl font-black mt-1`}>{budgetData.pranzo.max}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className={`p-8 rounded-2xl border-2 ${isDinner ? 'border-[#334155] bg-[#1E293B]' : 'border-[#EAE5DA] bg-white shadow-sm'}`}>
-                                            <div className={`flex items-center justify-center gap-2 text-xl font-black mb-6 ${accentColor}`}><Moon className="w-6 h-6" /> FABBISOGNO CENA</div>
-                                            <div className="flex flex-col items-center text-center mb-8">
-                                                <span className={`text-6xl font-black tracking-tighter tabular-nums ${textColor}`}>{budgetData.cena.stimati}</span>
-                                                <span className={`uppercase font-bold tracking-widest text-sm mt-2 ${mutedText}`}>Coperti Previsti</span>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 p-4 rounded-xl flex flex-col items-center">
-                                                    <span className={`${mutedText} text-xs font-bold uppercase tracking-wider`}>Coperti Minimi</span>
-                                                    <span className={`${textColor} text-2xl font-black mt-1`}>{budgetData.cena.min}</span>
-                                                </div>
-                                                <div className={`${accentBg} p-4 rounded-xl flex flex-col items-center`}>
-                                                    <span className={`${accentColor} text-xs font-bold uppercase tracking-wider`}>Coperti Massimi</span>
-                                                    <span className={`${accentColor} text-2xl font-black mt-1`}>{budgetData.cena.max}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-center mt-6">
-                                        <div className={`px-8 py-4 rounded-full border-2 flex items-center justify-center ${isDinner ? 'border-[#334155] bg-[#1E293B]' : 'border-[#EAE5DA] bg-gray-50'}`}>
-                                            <span className={`text-sm uppercase font-bold tracking-widest mr-4 ${mutedText}`}>Impatto Globale Stimato:</span>
-                                            <span className={`text-2xl font-black ${textColor}`}>{budgetData.totaleGlobale} Coperti totali</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                {/* ── Accesso secondario: Prenotazioni e Gestione Sala ── */}
-                {planTab !== 'inventario' && (
-                <div className={`flex items-center gap-3 pt-4 pb-2 px-1 border-t ${isDinner ? 'border-[#334155]' : 'border-[#EAE5DA]'}`}>
-                    <button
-                        onClick={() => setActiveView('Prenotazioni')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-colors whitespace-nowrap ${isDinner ? 'border-[#334155] text-[#94A3B8] hover:bg-[#334155] hover:text-[#F4F1EA]' : 'border-[#C4B9A8] text-[#967D62] hover:bg-[#EAE5DA] hover:text-[#2C2A28]'}`}
-                    >
-                        <CalendarDays className="w-4 h-4 shrink-0" />
-                        <span>Prenotazioni</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveView('Gestione Sala')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-colors whitespace-nowrap ${isDinner ? 'border-[#334155] text-[#94A3B8] hover:bg-[#334155] hover:text-[#F4F1EA]' : 'border-[#C4B9A8] text-[#967D62] hover:bg-[#EAE5DA] hover:text-[#2C2A28]'}`}
-                    >
-                        <LayoutGrid className="w-4 h-4 shrink-0" />
-                        <span>Gestione Sala</span>
-                    </button>
-                </div>
-                )}
-             </main>
+            <PianificazioneView
+              isDinner={isDinner} textColor={textColor} mutedText={mutedText}
+              cardBg={cardBg} accentColor={accentColor} accentBg={accentBg}
+              selectedDate={selectedDate}
+              planTab={planTab} setPlanTab={setPlanTab}
+              weekGenerated={weekGenerated} isGeneratingStaff={isGeneratingStaff}
+              weeklyStaffData={weeklyStaffData} staffDateRange={staffDateRange}
+              generateStaffPlan={generateStaffPlan}
+              isGeneratingBudget={isGeneratingBudget} budgetGenerated={budgetGenerated}
+              budgetData={budgetData} budgetStartDate={budgetStartDate}
+              setBudgetStartDate={setBudgetStartDate} budgetDuration={budgetDuration}
+              setBudgetDuration={setBudgetDuration} showBudgetSettings={showBudgetSettings}
+              setShowBudgetSettings={setShowBudgetSettings} generateBudgetPlan={generateBudgetPlan}
+              ingredients={ingredients} setIngredients={setIngredients}
+              recipes={recipes} setRecipes={setRecipes}
+              preparations={preparations} setPreparations={setPreparations}
+              newIngName={newIngName} setNewIngName={setNewIngName}
+              newIngUnit={newIngUnit} setNewIngUnit={setNewIngUnit}
+              newIngIdeal={newIngIdeal} setNewIngIdeal={setNewIngIdeal}
+              newIngSupplierMode={newIngSupplierMode} setNewIngSupplierMode={setNewIngSupplierMode}
+              newIngSupplierName={newIngSupplierName} setNewIngSupplierName={setNewIngSupplierName}
+              newIngQtyPerBox={newIngQtyPerBox} setNewIngQtyPerBox={setNewIngQtyPerBox}
+              newIngBoxCount={newIngBoxCount} setNewIngBoxCount={setNewIngBoxCount}
+              newIngSelectedSupplier={newIngSelectedSupplier} setNewIngSelectedSupplier={setNewIngSelectedSupplier}
+              newIngEditingIdeal={newIngEditingIdeal} setNewIngEditingIdeal={setNewIngEditingIdeal}
+              newIngPricePerBox={newIngPricePerBox} setNewIngPricePerBox={setNewIngPricePerBox}
+              newIngEditingPrice={newIngEditingPrice} setNewIngEditingPrice={setNewIngEditingPrice}
+              editingRecipeDish={editingRecipeDish} setEditingRecipeDish={setEditingRecipeDish}
+              editingRecipeIngId={editingRecipeIngId} setEditingRecipeIngId={setEditingRecipeIngId}
+              editingRecipeQty={editingRecipeQty} setEditingRecipeQty={setEditingRecipeQty}
+              editingRecipePcsYield={editingRecipePcsYield} setEditingRecipePcsYield={setEditingRecipePcsYield}
+              ingredientSearchText={ingredientSearchText} setIngredientSearchText={setIngredientSearchText}
+              dropdownRect={dropdownRect} setDropdownRect={setDropdownRect}
+              showVerifyForm={showVerifyForm} setShowVerifyForm={setShowVerifyForm}
+              verifyValues={verifyValues} setVerifyValues={setVerifyValues}
+              importFeedback={importFeedback} setImportFeedback={setImportFeedback}
+              handleInventoryImport={handleInventoryImport}
+              newPrepName={newPrepName} setNewPrepName={setNewPrepName}
+              newPrepYieldQty={newPrepYieldQty} setNewPrepYieldQty={setNewPrepYieldQty}
+              newPrepYieldUnit={newPrepYieldUnit} setNewPrepYieldUnit={setNewPrepYieldUnit}
+              editingPrepId={editingPrepId} setEditingPrepId={setEditingPrepId}
+              prepIngSearch={prepIngSearch} setPrepIngSearch={setPrepIngSearch}
+              prepIngId={prepIngId} setPrepIngId={setPrepIngId}
+              prepIngQty={prepIngQty} setPrepIngQty={setPrepIngQty}
+              prepDropdownRect={prepDropdownRect} setPrepDropdownRect={setPrepDropdownRect}
+              prepBatchQty={prepBatchQty} setPrepBatchQty={setPrepBatchQty}
+              convertToUnit={convertToUnit} isPieceUnit={isPieceUnit} isMeasuredUnit={isMeasuredUnit}
+              setActiveView={setActiveView}
+              getFestivitaAvviso={getFestivitaAvviso}
+            />
           )}
 
-          {/* ========== DASHBOARD ========== */}
-          {activeView === "Dashboard" && (
-             <main className={`flex-1 p-6 md:p-8 space-y-8 ${bgColor} transition-colors duration-500 max-w-7xl mx-auto w-full`}>
-                <div className={`flex items-center justify-center py-2 px-4 rounded-lg border ${accentBg} ${accentColor}`}>
-                     <div className="flex items-center gap-2">
-                        <Zap className="w-4 h-4" />
-                        <span className="text-sm font-medium tracking-wide">Smetti di indovinare. Inizia a prevedere con il forecasting proattivo.</span>
-                     </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <Card className={`${cardBg} flex flex-col justify-center`}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-                            <CardTitle className={`text-sm font-medium ${mutedText}`}>Meteo a {shift === 'pranzo' ? 'Pranzo (13:00)' : 'Cena (20:00)'}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-2 flex items-center gap-4">
-                            {WeatherIconBig}
-                            <div className="flex flex-col">
-                                <div className={`text-5xl font-bold tracking-tight ${textColor}`}>{weather.temp}°C</div>
-                                <p className={`text-sm mt-1 font-medium ${mutedText}`}>{getMeteoItaliano(weather.condition)}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    
-                    <Card className={`${cardBg} flex flex-col justify-center`}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-                            <CardTitle className={`text-sm font-medium ${mutedText}`}>Prenotati Iniziali</CardTitle>
-                            <CalendarCheck className={`h-4 w-4 ${mutedText}`} />
-                        </CardHeader>
-                        <CardContent className="pt-2 flex flex-col items-center">
-                            <Input type="number" value={bookedGuests} onChange={(e) => setBookedGuests(e.target.value)} className={`h-16 w-36 text-center text-5xl font-bold bg-transparent border-0 border-b-2 rounded-none focus:ring-0 ${isDinner ? 'border-[#475569] text-[#F4F1EA] focus-visible:border-[#967D62]' : 'border-[#EAE5DA] text-[#2C2A28] focus-visible:border-[#967D62]'}`} />
-                            {totalRegisteredPax > 0 && parseInt(bookedGuests || '0') < totalRegisteredPax && (
-                                <p className="text-red-500 text-xs mt-2 font-medium">⚠️ Minore della lista ({totalRegisteredPax} pax)</p>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Card className={`lg:col-span-2 ${cardBg}`}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className={`text-sm font-medium ${mutedText}`}>Verifica Servizio (Dati per Algoritmo)</CardTitle>
-                            <ClipboardCheck className={`h-4 w-4 ${mutedText}`} />
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-4">
-                            <div className="flex gap-4">
-                                <div className="flex-1 space-y-1">
-                                    <Label className={`text-xs ${mutedText}`}>Coperti Totali Reali</Label>
-                                    <Input type="number" placeholder="Es. 145" value={actualCovers} onChange={(e) => setActualCovers(e.target.value)} disabled={currentShiftSaved} className={`h-9 bg-transparent ${isDinner ? 'border-[#475569] text-[#F4F1EA]' : 'border-[#EAE5DA] text-[#2C2A28]'}`} />
-                                </div>
-                                <div className="flex-1 space-y-1">
-                                    <Label className={`text-xs ${mutedText}`}>Prenotati Effettivi</Label>
-                                    <div className="relative">
-                                        <Input type="number" placeholder="Senza No-Show" value={finalBooked} onChange={(e) => setFinalBooked(e.target.value)} disabled={currentShiftSaved} className={`h-9 bg-transparent pr-8 ${isDinner ? 'border-[#475569] text-[#F4F1EA]' : 'border-[#EAE5DA] text-[#2C2A28]'}`} />
-                                        <UsersRound className={`w-4 h-4 absolute right-2.5 top-2.5 ${mutedText} opacity-50`} />
-                                    </div>
-                                </div>
-                            </div>
-                            {currentShiftSaved ? (
-                                <div className={`flex justify-center items-center py-2 rounded-md ${isDinner ? 'bg-[#334155] text-[#967D62]' : 'bg-green-50 text-green-700'}`}>
-                                    <CheckCircle2 className="w-5 h-5 mr-2" />
-                                    <span className="font-semibold text-sm">Turno salvato correttamente nel database</span>
-                                </div>
-                            ) : (
-                                <div className="space-y-1">
-                                    <Button onClick={handleCloseShift} disabled={isSaveDisabled} className={`w-full font-semibold transition-colors disabled:opacity-50 bg-[#967D62] hover:bg-[#7A654E] ${isDinner ? 'text-[#F4F1EA]' : 'text-white shadow-sm'}`}>
-                                        Salva Dati e Chiudi Turno
-                                    </Button>
-                                    {isLockedByTime && (<p className="text-center text-xs text-orange-500 font-medium">Impossibile salvare: Turno in corso o nel futuro.</p>)}
-                                    {isLogicError && (<p className="text-center text-xs text-red-500 font-medium">Errore logico: I prenotati non possono superare i coperti totali.</p>)}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <div className="grid gap-8 md:grid-cols-12 lg:h-[520px]">
-                    {/* CARD PREVISIONE — metà larghezza */}
-                    <Card className={`md:col-span-6 flex flex-col justify-center items-center relative overflow-hidden ${cardBg}`}>
-                        <div className="absolute top-5 left-5 flex items-center gap-2">
-                             <div className={`p-1.5 rounded-full ${accentBg}`}><TrendingUp className={`w-4 h-4 ${accentColor}`} /></div>
-                             <span className={`${accentColor} font-bold text-xs tracking-wide`}>MOTORE PREDITTIVO ALEA</span>
-                        </div>
-                        <div className="text-center z-10 px-4">
-                            <h2 className={`${mutedText} font-medium mb-2 uppercase tracking-widest text-xs`}>Coperti Previsti — {shift === 'pranzo' ? 'Pranzo' : 'Cena'}</h2>
-                            <div className={`text-[7rem] font-bold leading-none tracking-tighter tabular-nums ${textColor}`}>
-                                {predictedCovers > maxCapacity ? (<span className="text-red-500">{predictedCovers}</span>) : (predictedCovers)}
-                            </div>
-                            {previsioneGiorno && (
-                                <p className={`${mutedText} mt-1 text-sm`}>
-                                    Forchetta: <span className={accentColor}>
-                                        {shift === 'pranzo' ? previsioneGiorno.pranzo.lo : previsioneGiorno.cena.lo}
-                                    </span> — <span className={accentColor}>
-                                        {shift === 'pranzo' ? previsioneGiorno.pranzo.hi : previsioneGiorno.cena.hi}
-                                    </span>
-                                </p>
-                            )}
-                            <div className={`mt-2 flex items-center justify-center gap-3 text-xs`}>
-                                <div className="text-center">
-                                    <span className={`block uppercase tracking-wider ${mutedText}`}>Prenotati</span>
-                                    <span className={`font-bold ${textColor}`}>{parseInt(bookedGuests || '0')}</span>
-                                </div>
-                                <span className={mutedText}>+</span>
-                                <div className="text-center">
-                                    <span className={`block uppercase tracking-wider ${mutedText}`}>Walk-in</span>
-                                    <span className={`font-bold ${accentColor}`}>{Math.max(0, predictedCovers - parseInt(bookedGuests || '0'))}</span>
-                                </div>
-                            </div>
-                            {predictedCovers > maxCapacity && (
-                                <p className="text-red-500 text-xs font-bold mt-2 bg-red-500/10 px-3 py-1 rounded-full border border-red-500/30">⚠️ Overbooking: supera capienza {maxCapacity}</p>
-                            )}
-                        </div>
-                        <div className={`absolute -right-20 -bottom-20 w-96 h-96 ${isDinner ? 'bg-[#967D62]/5' : 'bg-[#967D62]/10'} rounded-full blur-3xl pointer-events-none`} />
-                        {/* Barra attendibilità */}
-                        <div className="absolute bottom-0 left-0 right-0 z-10">
-                            <div className="px-4 py-1.5 flex items-center justify-between">
-                                <span className={`text-[10px] font-semibold uppercase tracking-wider ${mutedText}`}>Attendibilità</span>
-                                <span className="text-[10px] font-bold" style={{ color: dailyAttendibilita.coloreBar }}>
-                                    {dailyAttendibilita.livello.charAt(0).toUpperCase() + dailyAttendibilita.livello.slice(1)} — {dailyAttendibilita.motivazione}
-                                </span>
-                            </div>
-                            <div className="h-1.5 w-full" style={{ backgroundColor: dailyAttendibilita.coloreBar }} />
-                        </div>
-                    </Card>
-
-                    {/* CARD STAFF — metà larghezza, con messaggio convocazione esplicito */}
-                    <div className="md:col-span-6 flex flex-col gap-4">
-                        {/* Bottone menu */}
-                        <Card className={`${cardBg}`}>
-                            <CardContent className="pt-4 pb-4">
-                                <Button onClick={() => setIsMenuModalOpen(true)} className={`w-full py-4 flex items-center justify-center gap-2 bg-[#967D62] hover:bg-[#7A654E] text-white font-semibold text-sm shadow-sm`}>
-                                    <BookOpen className="w-4 h-4" /> Gestisci Disponibilità Menu
-                                </Button>
-                            </CardContent>
-                        </Card>
-
-                        {/* CARD CONVOCAZIONI */}
-                        <Card className={`flex-1 flex flex-col ${cardBg}`}>
-                            <CardHeader className="pb-3">
-                                <CardTitle className={`flex items-center gap-2 ${textColor}`}>
-                                    <Users className="w-5 h-5" /> Convocazioni Turno
-                                </CardTitle>
-                                <CardDescription className={mutedText}>
-                                    Personale consigliato per il turno
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex-1 flex flex-col gap-4">
-                                {/* Messaggio principale convocazione camerieri */}
-                                <div className={`p-5 rounded-2xl border ${isDinner ? 'bg-[#0F172A]/50 border-[#334155]' : 'bg-[#F4F1EA]/50 border-[#EAE5DA]'}`}>
-                                    <div className="flex items-start gap-4">
-                                        <div className={`text-5xl font-bold tabular-nums ${textColor} min-w-[3rem] text-center`}>
-                                            {staffAdvice.base}
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className={`font-semibold text-base ${textColor}`}>
-                                                {staffAdvice.tipo === 'fissi' && `${staffAdvice.base} camerieri fissi sufficienti`}
-                                                {staffAdvice.tipo === 'picco' && `${staffAdvice.base} fissi — chiama 1 nelle ore di picco`}
-                                                {staffAdvice.tipo === 'fissi_alto' && `${staffAdvice.base} camerieri — range ampio, valuta bene`}
-                                            </div>
-                                            {staffAdvice.tipo === 'fissi' && (
-                                                <p className={`text-sm mt-1 ${mutedText}`}>
-                                                    {staffAdvice.alternativa || `La forchetta rientra nella capacità di ${staffAdvice.base} ${staffAdvice.base === 1 ? 'cameriere' : 'camerieri'}.`}
-                                                </p>
-                                            )}
-                                            {staffAdvice.tipo === 'picco' && (
-                                                <p className={`text-sm mt-1 ${mutedText}`}>
-                                                    {staffAdvice.alternativa || `Oppure ${staffAdvice.base + 1} fissi se il picco è prolungato.`}
-                                                </p>
-                                            )}
-                                            {staffAdvice.tipo === 'fissi_alto' && (
-                                                <p className={`text-sm mt-1 ${mutedText}`}>
-                                                    {staffAdvice.alternativa || `Incertezza alta: considera di aggiungere 1 a chiamata.`}
-                                                </p>
-                                            )}
-                                            {staffAdvice.onCall > 0 && (
-                                                <div className={`mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${accentBg} ${accentColor} border-current/20`}>
-                                                    <Zap className="w-3 h-3" /> +{staffAdvice.onCall} a chiamata per il picco
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Cuochi e accoglienza */}
-                                <div className={`grid gap-3 ${hostMode === 'dinamico' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                                    <div className={`p-4 rounded-xl border ${isDinner ? 'bg-[#0F172A]/30 border-[#334155]' : 'bg-white border-[#EAE5DA]'}`}>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <ChefHat className={`w-4 h-4 ${accentColor}`} />
-                                            <span className={`text-xs font-semibold uppercase tracking-wide ${mutedText}`}>Cucina</span>
-                                        </div>
-                                        <div className={`font-bold ${textColor} ${hostMode === 'dinamico' ? 'text-3xl' : 'text-4xl'}`}>{cookAdvice.cuochi}</div>
-                                        <div className={`text-xs ${mutedText} mt-0.5`}>{cookAdvice.cuochi === 1 ? 'cuoco' : 'cuochi'}</div>
-                                        {cookAdvice.nota ? (
-                                            <div className={`mt-2 text-xs ${accentColor} font-medium`}>{cookAdvice.nota}</div>
-                                        ) : null}
-                                    </div>
-                                    {hostMode === 'dinamico' && (
-                                        <div className={`p-4 rounded-xl border ${isDinner ? 'bg-[#0F172A]/30 border-[#334155]' : 'bg-white border-[#EAE5DA]'}`}>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <ConciergeBell className={`w-4 h-4 ${accentColor}`} />
-                                                <span className={`text-xs font-semibold uppercase tracking-wide ${mutedText}`}>Accoglienza</span>
-                                            </div>
-                                            <div className={`text-3xl font-bold ${textColor}`}>{suggestedHosts}</div>
-                                            <div className={`text-xs ${mutedText} mt-0.5`}>{suggestedHosts === 1 ? 'persona' : 'persone'}</div>
-                                        </div>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </div>
-
-
-             </main>
-          )}
-
-          {/* ========== PRENOTAZIONI ========== */}
-          {activeView === "Prenotazioni" && (
-             <main className="flex-1 p-6 md:p-8 max-w-4xl mx-auto w-full">
-                <div className="space-y-8">
-                    <div className="flex flex-col gap-2 sm:gap-1">
-                        <div className="flex flex-wrap items-center gap-3">
-                            <h1 className={`text-2xl sm:text-3xl font-bold tracking-tight ${textColor}`}>Gestione Prenotazioni</h1>
-                            <div className={`flex items-center px-3 py-1 rounded-full border ${isDinner ? 'bg-[#1E293B] border-[#334155]' : 'bg-white border-[#EAE5DA]'} shadow-sm`}>
-                                <UsersRound className={`w-3.5 h-3.5 mr-1.5 ${isDinner ? 'text-[#F4F1EA]' : 'text-[#967D62]'}`} />
-                                <span className={`text-sm font-bold ${textColor}`}>{totalRegisteredPax} <span className="font-medium opacity-70 text-xs ml-0.5">coperti</span></span>
-                            </div>
-                        </div>
-                        <p className={`${mutedText} text-sm sm:text-base`}>Turno di {shift} del {formattedDate}</p>
-                    </div>
-
-                    <Card className={cardBg}>
-                        <CardHeader><CardTitle className={`text-lg ${textColor}`}>Nuova Prenotazione (Manuale)</CardTitle></CardHeader>
-                        <CardContent>
-                            <div className="flex flex-col md:flex-row gap-4 items-end">
-                                <div className="flex-1 space-y-2 w-full">
-                                    <Label className={textColor}>Nome Cliente</Label>
-                                    <Input placeholder="Es. Tavolo Rossi" value={newResName} onChange={e => setNewResName(e.target.value)} className={isDinner ? 'border-[#334155] bg-[#0F172A]' : 'border-[#EAE5DA]'} />
-                                </div>
-                                <div className="w-full md:w-36 space-y-2">
-                                    <Label className={textColor}>Telefono</Label>
-                                    <Input type="tel" placeholder="Es. 333 1234567" value={newResPhone} onChange={e => setNewResPhone(e.target.value)} className={isDinner ? 'border-[#334155] bg-[#0F172A]' : 'border-[#EAE5DA]'} />
-                                </div>
-                                <div className="w-full md:w-24 space-y-2">
-                                    <Label className={textColor}>Persone</Label>
-                                    <Input type="number" min="1" placeholder="0" value={newResPax} onChange={e => setNewResPax(e.target.value)} className={isDinner ? 'border-[#334155] bg-[#0F172A]' : 'border-[#EAE5DA]'} />
-                                </div>
-                                <div className="w-full md:w-32 space-y-2">
-                                    <Label className={textColor}>Orario</Label>
-                                    <Input type="time" value={newResTime} onChange={e => setNewResTime(e.target.value)} className={isDinner ? 'border-[#334155] bg-[#0F172A] [color-scheme:dark]' : 'border-[#EAE5DA]'} />
-                                </div>
-                                <div className="flex flex-col w-full md:w-auto mt-2 md:mt-0">
-                                    <Button onClick={addReservation} disabled={isTargetShiftClosed || !newResName || !newResPax || !newResTime} className={`disabled:opacity-50 bg-[#967D62] hover:bg-[#7A654E] ${isDinner ? 'text-[#F4F1EA]' : 'text-white'}`}>
-                                        <Plus className="w-4 h-4 mr-2" /> Aggiungi
-                                    </Button>
-                                </div>
-                            </div>
-                            {isTargetShiftClosed && (<p className="text-red-500 text-xs mt-3 font-semibold text-right">⚠️ Impossibile aggiungere: il turno per l'orario inserito è già chiuso.</p>)}
-                        </CardContent>
-                    </Card>
-
-                    <Card className={cardBg}>
-                        <CardHeader><CardTitle className={`text-lg ${textColor}`}>Lista Tavoli</CardTitle></CardHeader>
-                        <CardContent>
-                            {currentShiftReservations.length === 0 ? (
-                                <div className={`text-center py-8 ${mutedText}`}>Nessuna prenotazione inserita manualmente per questo turno.</div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {currentShiftReservations.sort((a,b) => (a.time || "").localeCompare(b.time || "")).map(res => (
-                                        <div key={res.id} className={`flex items-center justify-between p-3 rounded-lg border ${res.isOutOfBounds ? 'border-red-500/50 bg-red-500/5' : (isDinner ? 'bg-[#0F172A] border-[#334155]' : 'bg-gray-50 border-[#EAE5DA]')}`}>
-                                            <div className="flex items-center gap-3 flex-wrap">
-                                                <div className={`font-mono text-sm font-bold ${res.isOutOfBounds ? 'text-red-500' : accentColor}`}>{res.time}</div>
-                                                <div className="flex flex-col">
-                                                    <span className={`font-semibold text-sm ${res.isOutOfBounds ? mutedText : textColor}`}>{res.name}</span>
-                                                    {res.phone && <span className={`text-xs ${mutedText}`}>📞 {res.phone}</span>}
-                                                </div>
-                                                {res.isOutOfBounds ? (
-                                                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 text-[10px] font-bold border border-red-500/20 uppercase"><AlertTriangle className="w-3 h-3" /> Fuori Turno</div>
-                                                ) : (
-                                                    <div className={`flex items-center text-sm ${mutedText} bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded-full`}><UsersRound className="w-3 h-3 mr-1" /> {res.pax}</div>
-                                                )}
-                                                {res.isSeated && (
-                                                    <div className={`flex items-center text-xs font-bold px-2 py-0.5 rounded-full ${isDinner ? 'text-[#F4F1EA] bg-[#967D62]' : 'text-white bg-[#967D62]'}`}>Seduto (Tav. {res.tableId})</div>
-                                                )}
-                                            </div>
-                                            <Button variant="ghost" size="icon" onClick={() => deleteReservation(res.id)} className="text-red-500 hover:bg-red-500/10 hover:text-red-600"><Trash2 className="w-4 h-4" /></Button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-             </main>
+          {/* ========== DASHBOARD + PRENOTAZIONI ========== */}
+          {(activeView === "Dashboard" || activeView === "Prenotazioni") && (
+            <DashboardView
+              isDinner={isDinner} textColor={textColor} mutedText={mutedText}
+              cardBg={cardBg} accentColor={accentColor} accentBg={accentBg} bgColor={bgColor}
+              selectedDate={selectedDate} shift={shift}
+              formattedDate={formattedDate} mobileDate={mobileDate}
+              isToday={isToday} isTargetShiftClosed={isTargetShiftClosed}
+              isShiftOngoing={isShiftOngoing} isLockedByTime={isLockedByTime}
+              isSaveDisabled={isSaveDisabled} currentShiftSaved={currentShiftSaved}
+              actualCovers={actualCovers} setActualCovers={setActualCovers}
+              finalBooked={finalBooked} setFinalBooked={setFinalBooked}
+              predictedCovers={predictedCovers} bookedGuests={bookedGuests}
+              setBookedGuests={setBookedGuests} previsioneGiorno={previsioneGiorno}
+              isLogicError={isLogicError} weather={weather}
+              staffAdvice={staffAdvice} cookAdvice={cookAdvice}
+              suggestedHosts={suggestedHosts} hostMode={hostMode}
+              dailyAttendibilita={dailyAttendibilita}
+              handleCloseShift={handleCloseShift} setActiveView={setActiveView}
+              reservations={reservations} totalRegisteredPax={totalRegisteredPax}
+              newResName={newResName} setNewResName={setNewResName}
+              newResPax={newResPax} setNewResPax={setNewResPax}
+              newResTime={newResTime} setNewResTime={setNewResTime}
+              newResPhone={newResPhone} setNewResPhone={setNewResPhone}
+              addReservation={addReservation} deleteReservation={deleteReservation}
+              activeView={activeView}
+              maxCapacity={maxCapacity}
+              setIsMenuModalOpen={setIsMenuModalOpen}
+            />
           )}
 
           {/* ========== IMPOSTAZIONI ========== */}
           {activeView === "Impostazioni" && (
-             <main className="flex-1 p-6 md:p-8 max-w-4xl mx-auto w-full">
-                <div className="space-y-8">
-                    <div>
-                        <h1 className={`text-3xl font-bold tracking-tight ${textColor}`}>Impostazioni</h1>
-                        <p className={`${mutedText} mt-1`}>Configura i parametri operativi del ristorante.</p>
-                    </div>
+            <ImpostazioniView
+              isDinner={isDinner} textColor={textColor} mutedText={mutedText}
+              cardBg={cardBg} accentColor={accentColor}
+              waiterRatio={waiterRatio} setWaiterRatio={setWaiterRatio}
+              cookRatio={cookRatio} setCookRatio={setCookRatio}
+              maxCapacity={maxCapacity} setMaxCapacity={setMaxCapacity}
+              hostMode={hostMode} setHostMode={setHostMode}
+              hostRatio={hostRatio} setHostRatio={setHostRatio}
+              pranzoStart={pranzoStart} setPranzoStart={setPranzoStart}
+              pranzoEnd={pranzoEnd} setPranzoEnd={setPranzoEnd}
+              cenaStart={cenaStart} setCenaStart={setCenaStart}
+              cenaEnd={cenaEnd} setCenaEnd={setCenaEnd}
+              showDailyHours={showDailyHours} setShowDailyHours={setShowDailyHours}
+              dailyHours={dailyHours}
+              handleGlobalHourChange={handleGlobalHourChange}
+              updateDailyHour={updateDailyHour}
+              setActiveView={setActiveView}
+            />
+          )}
 
-                    <Card className={cardBg}>
-                        <CardHeader>
-                            <CardTitle className={`flex items-center gap-2 ${textColor}`}><Users className={`w-5 h-5 ${accentColor}`} /> Rapporti Staff & Sala</CardTitle>
-                            <CardDescription className={mutedText}>Alea calcolerà lo staff necessario dividendo le previsioni per questi valori.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="flex items-center gap-4">
-                                <Label className={`w-32 ${textColor}`}>Camerieri di sala:</Label>
-                                <div className="flex items-center gap-3">
-                                    <span className={mutedText}>1 ogni</span>
-                                    <Input type="number" value={waiterRatio} onChange={e => setWaiterRatio(Number(e.target.value))} className={`w-20 text-center ${isDinner ? 'border-[#334155] bg-[#0F172A]' : 'border-[#EAE5DA]'}`} />
-                                    <span className={mutedText}>coperti</span>
-                                </div>
-                            </div>
-                            <Separator className={isDinner ? 'bg-[#334155]' : 'bg-[#EAE5DA]'} />
-                            <div className="flex items-center gap-4">
-                                <Label className={`w-32 ${textColor}`}>Cuochi / Cucina:</Label>
-                                <div className="flex items-center gap-3">
-                                    <span className={mutedText}>1 ogni</span>
-                                    <Input type="number" value={cookRatio} onChange={e => setCookRatio(Number(e.target.value))} className={`w-20 text-center ${isDinner ? 'border-[#334155] bg-[#0F172A]' : 'border-[#EAE5DA]'}`} />
-                                    <span className={mutedText}>coperti</span>
-                                </div>
-                            </div>
-                            <Separator className={isDinner ? 'bg-[#334155]' : 'bg-[#EAE5DA]'} />
-                            <div className="space-y-4 pt-2">
-                                <Label className={`text-base font-semibold ${textColor}`}>Gestione Accoglienza / Maitre</Label>
-                                <div className="flex gap-2">
-                                    <Button variant="outline" onClick={() => setHostMode('fisso')} className={hostMode === 'fisso' ? '!bg-[#967D62] !text-white !border-[#967D62]' : `bg-transparent ${isDinner ? 'text-[#F4F1EA] border-[#334155] hover:bg-[#334155]' : 'text-black border-[#EAE5DA] hover:bg-gray-100'}`}>Fisso / Non Previsto</Button>
-                                    <Button variant="outline" onClick={() => setHostMode('dinamico')} className={hostMode === 'dinamico' ? '!bg-[#967D62] !text-white !border-[#967D62]' : `bg-transparent ${isDinner ? 'text-[#F4F1EA] border-[#334155] hover:bg-[#334155]' : 'text-black border-[#EAE5DA] hover:bg-gray-100'}`}>Dinamico (Variabile)</Button>
-                                </div>
-                                {hostMode === 'fisso' ? (
-                                    <p className={`text-sm ${mutedText}`}>Personale fisso o gestito dai camerieri. Non verrà mostrato nei calcoli del turno.</p>
-                                ) : (
-                                    <div className="flex items-center gap-4 mt-2">
-                                        <Label className={`w-32 ${textColor}`}>Aggiungi 1 ogni:</Label>
-                                        <div className="flex items-center gap-3">
-                                            <Input type="number" value={hostRatio} onChange={e => setHostRatio(Number(e.target.value))} className={`w-20 text-center ${isDinner ? 'border-[#334155] bg-[#0F172A]' : 'border-[#EAE5DA]'}`} />
-                                            <span className={mutedText}>coperti</span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                            <Separator className={isDinner ? 'bg-[#334155]' : 'bg-[#EAE5DA]'} />
-                            <div className="flex items-center gap-4">
-                                <Label className={`w-32 ${textColor}`}>Capienza Massima:</Label>
-                                <div className="flex items-center gap-3">
-                                    <Input type="number" value={maxCapacity} onChange={e => setMaxCapacity(Number(e.target.value))} className={`w-24 text-center ${isDinner ? 'border-[#334155] bg-[#0F172A]' : 'border-[#EAE5DA]'}`} />
-                                    <span className={mutedText}>sedute totali</span>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className={cardBg}>
-                        <CardHeader className="flex flex-row justify-between items-start">
-                            <div>
-                                <CardTitle className={`flex items-center gap-2 ${textColor}`}><Clock className={`w-5 h-5 ${accentColor}`} /> Orari Turni (Default)</CardTitle>
-                                <CardDescription className={mutedText}>Definisci gli orari base. Clicca la matita per modificare i giorni speciali.</CardDescription>
-                            </div>
-                            <Button variant="ghost" size="icon" onClick={() => setShowDailyHours(!showDailyHours)} className={`transition-colors ${showDailyHours ? (isDinner ? 'bg-[#967D62] text-[#F4F1EA]' : 'bg-[#967D62] text-white') : (isDinner ? 'hover:bg-[#334155] text-[#F4F1EA]' : 'hover:bg-gray-100')}`}>
-                                <Pencil className="w-4 h-4" />
-                            </Button>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-                                <Label className={`w-20 ${textColor} font-bold`}>PRANZO</Label>
-                                <div className="flex items-center gap-2">
-                                    <span className={`text-xs ${mutedText}`}>Inizio:</span>
-                                    <Input type="time" value={pranzoStart} onChange={e => handleGlobalHourChange('pStart', e.target.value)} className={`w-28 ${isDinner ? 'border-[#334155] bg-[#0F172A] [color-scheme:dark]' : 'border-[#EAE5DA]'}`} />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className={`text-xs ${mutedText}`}>Fine:</span>
-                                    <Input type="time" value={pranzoEnd} onChange={e => handleGlobalHourChange('pEnd', e.target.value)} className={`w-28 ${isDinner ? 'border-[#334155] bg-[#0F172A] [color-scheme:dark]' : 'border-[#EAE5DA]'}`} />
-                                </div>
-                            </div>
-                            <Separator className={isDinner ? 'bg-[#334155]' : 'bg-[#EAE5DA]'} />
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-                                <Label className={`w-20 ${textColor} font-bold`}>CENA</Label>
-                                <div className="flex items-center gap-2">
-                                    <span className={`text-xs ${mutedText}`}>Inizio:</span>
-                                    <Input type="time" value={cenaStart} onChange={e => handleGlobalHourChange('cStart', e.target.value)} className={`w-28 ${isDinner ? 'border-[#334155] bg-[#0F172A] [color-scheme:dark]' : 'border-[#EAE5DA]'}`} />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className={`text-xs ${mutedText}`}>Fine:</span>
-                                    <Input type="time" value={cenaEnd} onChange={e => handleGlobalHourChange('cEnd', e.target.value)} className={`w-28 ${isDinner ? 'border-[#334155] bg-[#0F172A] [color-scheme:dark]' : 'border-[#EAE5DA]'}`} />
-                                </div>
-                            </div>
-
-                            {showDailyHours && (
-                                <div className={`mt-8 pt-6 border-t ${isDinner ? 'border-[#334155]' : 'border-[#EAE5DA]'} space-y-4`}>
-                                    <h4 className={`font-bold text-sm uppercase tracking-wider mb-4 ${accentColor}`}>Orari Personalizzati per Giorno</h4>
-                                    {weekDaysOrdered.map(day => (
-                                        <div key={day} className={`flex flex-col lg:flex-row items-start lg:items-center gap-4 p-3 rounded-lg border ${isDinner ? 'bg-[#0F172A] border-[#334155]' : 'bg-gray-50 border-[#EAE5DA]'}`}>
-                                            <div className={`w-24 font-bold ${textColor}`}>{day}</div>
-                                            <div className="flex flex-wrap items-center gap-4">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`text-xs font-semibold uppercase ${mutedText}`}>Pranzo:</span>
-                                                    <Input type="time" value={dailyHours[day].pStart} onChange={e => updateDailyHour(day, 'pStart', e.target.value)} className={`w-24 h-8 text-xs ${isDinner ? 'border-[#475569] bg-[#1E293B] [color-scheme:dark]' : 'border-[#D1CCC0] bg-white'}`} />
-                                                    <span className={mutedText}>-</span>
-                                                    <Input type="time" value={dailyHours[day].pEnd} onChange={e => updateDailyHour(day, 'pEnd', e.target.value)} className={`w-24 h-8 text-xs ${isDinner ? 'border-[#475569] bg-[#1E293B] [color-scheme:dark]' : 'border-[#D1CCC0] bg-white'}`} />
-                                                </div>
-                                                <div className="hidden lg:block h-4 w-px bg-gray-300 dark:bg-gray-700" />
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`text-xs font-semibold uppercase ${mutedText}`}>Cena:</span>
-                                                    <Input type="time" value={dailyHours[day].cStart} onChange={e => updateDailyHour(day, 'cStart', e.target.value)} className={`w-24 h-8 text-xs ${isDinner ? 'border-[#475569] bg-[#1E293B] [color-scheme:dark]' : 'border-[#D1CCC0] bg-white'}`} />
-                                                    <span className={mutedText}>-</span>
-                                                    <Input type="time" value={dailyHours[day].cEnd} onChange={e => updateDailyHour(day, 'cEnd', e.target.value)} className={`w-24 h-8 text-xs ${isDinner ? 'border-[#475569] bg-[#1E293B] [color-scheme:dark]' : 'border-[#D1CCC0] bg-white'}`} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Button onClick={() => setActiveView("Dashboard")} className={`w-full py-6 text-lg font-semibold shadow-sm bg-[#967D62] hover:bg-[#7A654E] ${isDinner ? 'text-[#F4F1EA]' : 'text-white'}`}>
-                        Salva e Torna alla Dashboard
-                    </Button>
-                </div>
-             </main>
+          {/* ========== REDDITIVITÀ MENU ========== */}
+          {activeView === "Redditività Menu" && (
+            <MenuProfitability
+              ingredients={ingredients}
+              setIngredients={setIngredients}
+              recipes={recipes}
+              isDinner={isDinner}
+            />
           )}
 
         </SidebarInset>
