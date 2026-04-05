@@ -629,9 +629,8 @@ export function PianificazioneView(props: PianificazioneViewProps) {
                                                                             if (!validId || !editingRecipeQty) return;
                                                                             const baseUnit = ingObj?.unit ?? prepObj?.yieldUnit ?? '';
                                                                             const selectedUnit = editingRecipePcsYield || baseUnit;
-                                                                            // Normalizza la qty alla UdM base dell'inventario
-                                                                            const normalizedQty = baseUnit ? normalizeToBase(Number(editingRecipeQty), selectedUnit, baseUnit) : Number(editingRecipeQty);
-                                                                            setRecipes(prev => ({ ...prev, [dish]: [...(prev[dish] || []), { ingredientId: validId, qty: normalizedQty, unit: selectedUnit }] }));
+                                                                            // Salva qty e unit così come inseriti — la normalizzazione avviene solo nei calcoli
+                                                                            setRecipes(prev => ({ ...prev, [dish]: [...(prev[dish] || []), { ingredientId: validId, qty: Number(editingRecipeQty), unit: selectedUnit }] }));
                                                                             setEditingRecipeIngId(''); setEditingRecipeQty(''); setEditingRecipePcsYield(''); setIngredientSearchText('');
                                                                         }} className="px-2 py-1 rounded-md bg-[#967D62] text-white text-xs font-bold hover:bg-[#7A654E] self-end">
                                                                             <Plus className="w-3 h-3" />
@@ -742,7 +741,9 @@ export function PianificazioneView(props: PianificazioneViewProps) {
                                                                 if (sup) ppu = sup.pricePerBox / sup.qtyPerBox;
                                                             }
                                                             if (ppu == null) { missing = true; return; }
-                                                            total += ppu * row.qty;
+                                                            // row.qty può essere in un sottomultiplo (es. g invece di kg) — normalizza a baseUnit per il calcolo costo
+                                                            const qtyInBase = normalizeToBase(row.qty, row.unit ?? ing.unit, ing.unit);
+                                                            total += ppu * qtyInBase;
                                                         });
                                                         return missing ? null : total / prep.yieldQty;
                                                     })();
@@ -841,10 +842,9 @@ export function PianificazioneView(props: PianificazioneViewProps) {
                                                                         const selIng = ingredients.find(i => i.id === prepIngId);
                                                                         const baseUnit = selIng?.unit ?? '';
                                                                         const selectedUnit = unitPart || baseUnit;
-                                                                        // Normalizza alla UdM base dell'inventario
-                                                                        const normalizedQty = baseUnit ? normalizeToBase(Number(qtyPart), selectedUnit, baseUnit) : Number(qtyPart);
+                                                                        // Salva qty e unit così come inseriti — la normalizzazione avviene solo nei calcoli
                                                                         setPreparations(prev => prev.map(p => p.id === prep.id
-                                                                            ? { ...p, ingredients: [...p.ingredients, { ingredientId: validId, qty: normalizedQty, unit: selectedUnit }] }
+                                                                            ? { ...p, ingredients: [...p.ingredients, { ingredientId: validId, qty: Number(qtyPart), unit: selectedUnit }] }
                                                                             : p));
                                                                         setPrepIngId(''); setPrepIngQty(''); setPrepIngSearch('');
                                                                     }} className="px-2 py-1 rounded-md bg-[#967D62] text-white text-xs font-bold hover:bg-[#7A654E]">
@@ -901,7 +901,9 @@ export function PianificazioneView(props: PianificazioneViewProps) {
                                                                         prep.ingredients.forEach(row => {
                                                                             const idx = updated.findIndex(i => i.id === row.ingredientId);
                                                                             if (idx !== -1) {
-                                                                                updated[idx] = { ...updated[idx], currentQty: Math.max(0, updated[idx].currentQty - row.qty * ratio) };
+                                                                                // row.qty può essere in un sottomultiplo — normalizza a baseUnit del magazzino
+                                                                                const qtyInBase = normalizeToBase(row.qty, row.unit ?? updated[idx].unit, updated[idx].unit);
+                                                                                updated[idx] = { ...updated[idx], currentQty: Math.max(0, updated[idx].currentQty - qtyInBase * ratio) };
                                                                             }
                                                                         });
                                                                         return updated;
@@ -921,10 +923,11 @@ export function PianificazioneView(props: PianificazioneViewProps) {
                                                                     const ing = ingredients.find(i => i.id === row.ingredientId);
                                                                     if (!ing) return null;
                                                                     const scaled = row.qty * (Number(prepBatchQty[prep.id]) / prep.yieldQty);
+                                                                    const displayUnit = row.unit ?? ing.unit;
                                                                     return (
                                                                         <div key={row.ingredientId} className={`flex justify-between ${textColor}`}>
                                                                             <span>{ing.name}</span>
-                                                                            <span className="font-mono">−{scaled.toFixed(2)}{ing.unit}</span>
+                                                                            <span className="font-mono">−{scaled.toFixed(2)}{displayUnit}</span>
                                                                         </div>
                                                                     );
                                                                 })}
