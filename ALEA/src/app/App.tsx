@@ -128,7 +128,7 @@ function App() {
   };
 
   // ====== NAVIGAZIONE ======
-  const [activeView, setActiveView] = useState<string>("Gestione Sala");
+  const [activeView, setActiveView] = useState<string>("Dashboard");
   const [shift, setShift] = useState<ShiftType>('pranzo');
   const [bookedGuests, setBookedGuests] = useState<string>('');
   
@@ -222,8 +222,6 @@ function App() {
   const [prepIngQty, setPrepIngQty] = useState('');
   const [prepDropdownRect, setPrepDropdownRect] = useState<DOMRect | null>(null);
   const [prepBatchQty, setPrepBatchQty] = useState<Record<string, string>>({});
-  const [newPrepIdealQty, setNewPrepIdealQty] = useState('');
-  const [newPrepEditingIdeal, setNewPrepEditingIdeal] = useState(false);
 
   // ====== PRENOTAZIONI ======
   const [savedShifts, setSavedShifts] = useState<string[]>(() => {
@@ -272,8 +270,7 @@ function App() {
   // Preparazioni interne: semi-lavorati fatti in casa
   const [preparations, setPreparations] = useState<Array<{
       id: string; name: string; yieldQty: number; yieldUnit: string;
-      currentQty: number; idealQty: number;
-      ingredients: Array<{ ingredientId: string; qty: number; unit?: string }>;
+      ingredients: Array<{ ingredientId: string; qty: number }>;
   }>>([]);
   // Form aggiunta ingrediente
   const [newIngName, setNewIngName] = useState('');
@@ -434,14 +431,7 @@ function App() {
 
           const { data: preps } = await supabase
               .from('preparations').select('data').eq('user_id', userId);
-          if (preps && preps.length > 0) {
-              // Migration retroattiva: aggiunge currentQty/idealQty se mancanti
-              setPreparations(preps.map(r => ({
-                  currentQty: 0,
-                  idealQty: 0,
-                  ...r.data,
-              })));
-          }
+          if (preps && preps.length > 0) setPreparations(preps.map(r => r.data));
       };
       loadInventory();
   }, [isLoggedIn]);
@@ -2175,8 +2165,6 @@ function App() {
               prepIngQty={prepIngQty} setPrepIngQty={setPrepIngQty}
               prepDropdownRect={prepDropdownRect} setPrepDropdownRect={setPrepDropdownRect}
               prepBatchQty={prepBatchQty} setPrepBatchQty={setPrepBatchQty}
-              newPrepIdealQty={newPrepIdealQty} setNewPrepIdealQty={setNewPrepIdealQty}
-              newPrepEditingIdeal={newPrepEditingIdeal} setNewPrepEditingIdeal={setNewPrepEditingIdeal}
               convertToUnit={convertToUnit} isPieceUnit={isPieceUnit} isMeasuredUnit={isMeasuredUnit}
               setActiveView={setActiveView}
               getFestivitaAvviso={getFestivitaAvviso}
