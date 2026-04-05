@@ -297,7 +297,7 @@ function App() {
   const [verifyValues, setVerifyValues] = useState<Record<string, string>>({});
   const [importFeedback, setImportFeedback] = useState<{ type: 'success' | 'error' | 'info'; msg: string } | null>(null);
   // Tab pianificazione aggiornata
-  const [planTab, setPlanTab] = useState<'sala' | 'inventario' | 'preparazioni' | 'cucina'>('sala');
+  const [planTab, setPlanTab] = useState<'sala' | 'inventario' | 'ricette' | 'cucina'>('sala');
 
   // ====== TAVOLI (STATO CONDIVISO TRA GESTIONALE E PERSONALE) ======
   const [tables, setTables] = useState<Table[]>([
